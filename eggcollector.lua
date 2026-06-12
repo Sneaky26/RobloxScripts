@@ -1,8 +1,9 @@
--- Kyeggo Ground Collector + Enhanced Rare Detector (Gamma/Alpha potential)
--- Only collects eggs ON THE GROUND
+-- Kyeggo Event Auto Egg + Currency Collector + Rare Notifier
+-- Only collects eggs ON THE GROUND (ignores falling ones)
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 local SoundService = game:GetService("SoundService")
 
 local player = Players.LocalPlayer
@@ -22,8 +23,8 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = player.PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 270, 0, 220)
-frame.Position = UDim2.new(0.5, -135, 0, 20)
+frame.Size = UDim2.new(0, 260, 0, 210)
+frame.Position = UDim2.new(0.5, -130, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -75,7 +76,7 @@ statusLabel.Parent = frame
 -- Toggle Button
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-toggleBtn.Position = UDim2.new(0.1, 0, 0, 130)
+toggleBtn.Position = UDim2.new(0.1, 0, 0, 125)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 toggleBtn.Text = "START"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -87,45 +88,34 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 8)
 btnCorner.Parent = toggleBtn
 
--- === RARE DETECTION ===
-local function isRareEgg(obj)
-    local name = obj.Name:lower()
-    if name:find("rainbow") or name:find("faberge") or name:find("star") or 
-       name:find("pyramind") or name:find("diamond") or name:find("watermelon") or
-       name:find("wavy") or name:find("gold") or name:find("colored") then
-        return true
-    end
-    return false
-end
-
-local function isSuperRareEgg(obj)  -- For Gamma/Alpha potential eggs
-    local name = obj.Name:lower()
-    return name:find("rainbow") or name:find("faberge") or name:find("star")
-end
-
-local function showRareNotification(egg, isSuper)
-    local color = isSuper and Color3.fromRGB(255, 0, 100) or Color3.fromRGB(180, 0, 0)
-    local text = isSuper and "🔥 SUPER RARE EGG! (Gamma/Alpha Chance) 🔥" or "🎉 RARE KYEGGO EGG! 🎉"
-    
+-- Rare Notification
+local function showRareNotification(egg)
     local notif = Instance.new("TextLabel")
-    notif.Size = UDim2.new(0, 340, 0, 100)
-    notif.Position = UDim2.new(0.5, -170, 0.2, 0)
-    notif.BackgroundColor3 = color
-    notif.Text = text .. "\n" .. (egg.Name or "Special Egg")
+    notif.Size = UDim2.new(0, 320, 0, 90)
+    notif.Position = UDim2.new(0.5, -160, 0.25, 0)
+    notif.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+    notif.Text = "🎉 RARE KYEGGO SPAWNED! 🎉\n" .. (egg.Name or "Special Egg")
     notif.TextColor3 = Color3.fromRGB(255, 255, 100)
     notif.TextScaled = true
     notif.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
     notif.Parent = screenGui
     
     local sound = Instance.new("Sound")
-    sound.SoundId = isSuper and "rbxassetid://1848354536" or "rbxassetid://131057809"  -- Louder for super rare
-    sound.Volume = 0.85
+    sound.SoundId = "rbxassetid://131057809"
+    sound.Volume = 0.8
     sound.Parent = workspace
     sound:Play()
     
-    task.wait(5)
+    task.wait(4.5)
     notif:Destroy()
     sound:Destroy()
+end
+
+local function isRareKyeggo(egg)
+    local name = egg.Name:lower()
+    return name:find("rainbow") or name:find("faberge") or name:find("gold") or 
+           name:find("colored") or name:find("red") or name:find("blue") or 
+           name:find("green") or name:find("purple") or name:find("special")
 end
 
 -- Toggle
@@ -159,12 +149,13 @@ local function collectItems()
         if not isRunning then break end
         if itemsFound >= 8 then break end
 
+        -- Only MeshParts named Egg or Easter Egg
         if (obj.Name == "Egg" or obj.Name == "Easter Egg") and obj:IsA("MeshPart") then
             local pos = obj.Position
             local dist = (root.Position - pos).Magnitude
             
-            -- Ground only filter
-            if dist < 130 and pos.Y < 60 then
+            -- IMPORTANT FILTER: Only collect eggs CLOSE TO THE GROUND
+            if dist < 130 and pos.Y < 60 then  -- Adjust 60 if needed (lower = stricter)
                 itemsFound += 1
                 
                 root.CFrame = CFrame.new(pos + Vector3.new(0, 4, 0))
@@ -172,15 +163,16 @@ local function collectItems()
                 root.CFrame = originalCFrame
                 task.wait(0.08)
 
+                -- Egg (Kyeggo encounter)
                 if obj.Name == "Egg" then
                     collectedEggs += 1
                     eggLabel.Text = "Eggs Collected: " .. collectedEggs
                     
-                    local isSuper = isSuperRareEgg(obj)
-                    if isRareEgg(obj) then
-                        showRareNotification(obj, isSuper)
+                    if isRareKyeggo(obj) then
+                        showRareNotification(obj)
                     end
                 else
+                    -- Currency
                     collectedCurrency += 1
                     currencyLabel.Text = "Easter Eggs: " .. collectedCurrency
                 end
@@ -197,4 +189,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ Enhanced Kyeggo Collector Loaded! (Rare + Gamma/Alpha potential alerts)")
+print("✅ Ground-Only Kyeggo Collector Loaded! (Ignores falling eggs)")
