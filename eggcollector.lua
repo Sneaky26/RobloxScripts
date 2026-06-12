@@ -386,8 +386,8 @@ local COMMON_KYEGGOS = {
     ["Kyeggo-rviolet"]  = true,
     ["Kyeggo-rorange"]  = true,
     ["Kyeggo-rred"]     = true,
-    ["Kyeggo-rblue"]     = true,
-    ["Kyeggo-rgreen"]    = true,
+    ["Kyeggo-blue"]     = true,
+    ["Kyeggo-green"]    = true,
     ["Kyeggo-pattern4"] = true,
     ["Kyeggo-pattern3"] = true,
     ["Kyeggo-pattern2"] = true,
@@ -554,40 +554,20 @@ local function getAllText(gui)
     return table.concat(texts, " ")
 end
 
-local function clickRunButton(gui)
-    local target = nil
-
-    -- Pass 1: exact text "Run"
-    for _, obj in ipairs(gui:GetDescendants()) do
-        if obj:IsA("TextButton") and obj.Text == "Run" then
-            target = obj break
-        end
-    end
-    -- Pass 2: name contains "run"
-    if not target then
-        for _, obj in ipairs(gui:GetDescendants()) do
-            if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Name:lower():find("run") then
-                target = obj break
-            end
-        end
-    end
-
-    if not target then return false, nil end
-
-    -- Try all firing methods — Loomian Legacy uses a custom button handler
-    pcall(function() target.MouseButton1Click:Fire() end)
-    pcall(function() target.Activated:Fire() end)
-    -- Simulate real mouse click via VirtualUser if available
+local function clickRunButton()
+    -- Run button is always at bottom-center of screen (from screenshot)
+    -- Screen center-X, roughly 85% down the screen
+    local vu = game:GetService("VirtualUser")
+    local vp = Camera.ViewportSize
+    local x  = vp.X / 2
+    local y  = vp.Y * 0.85
+    local pos = Vector2.new(x, y)
     pcall(function()
-        local vu = game:GetService("VirtualUser")
-        local pos = target.AbsolutePosition
-        local size = target.AbsoluteSize
-        vu:Button1Down(Vector2.new(pos.X + size.X/2, pos.Y + size.Y/2), CFrame.new())
-        task.wait(0.05)
-        vu:Button1Up(Vector2.new(pos.X + size.X/2, pos.Y + size.Y/2), CFrame.new())
+        vu:Button1Down(pos, CFrame.new())
+        task.wait(0.1)
+        vu:Button1Up(pos, CFrame.new())
     end)
-
-    return true, target.Text or target.Name
+    return true
 end
 
 local function isBattleGui(gui)
@@ -655,13 +635,8 @@ task.spawn(function()
                     task.wait(3)
 
                     if not isKeeper(getAllText(gui)) then
-                        local clicked, btnName = clickRunButton(gui)
-                        if clicked then
-                            encounterLabel.Text = "Last: Skipped ✓"
-                        else
-                            encounterLabel.Text = "Last: Run btn not found ⚠"
-                            showNotif("⚠ Run button not found!", Color3.fromRGB(200, 100, 0))
-                        end
+                        clickRunButton()
+                        encounterLabel.Text = "Last: Skipped ✓"
                     end
                 end
 
