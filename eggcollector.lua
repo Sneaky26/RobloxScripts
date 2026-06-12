@@ -608,6 +608,19 @@ end)
 -- ── Auto-Run System ───────────────────────────────────────────────────────────
 -- ══════════════════════════════════════════════════════════════════════════════
 
+local function isKeeper(text)
+    for name, _ in pairs(COMMON_KYEGGOS) do
+        if text:find(name, 1, true) then
+            return false, name
+        end
+    end
+    if text:lower():find("kyeggo") then
+        local found = text:match("Kyeggo%S*") or text:match("kyeggo%S*") or "Kyeggo variant"
+        return true, found
+    end
+    return false, nil
+end
+
 local function getAllText(gui)
     local texts = {}
     for _, obj in ipairs(gui:GetDescendants()) do
@@ -617,69 +630,69 @@ local function getAllText(gui)
             end
         end
     end
-    return table.concat(texts, " | ")
+    return table.concat(texts, " ")
 end
 
-local function shouldAutoRun(text)
-    text = text:lower()
-    
-    -- First priority: Check if it's in COMMON_KYEGGOS list → Auto Run
-    for name, _ in pairs(COMMON_KYEGGOS) do
-        if text:find(name:lower(), 1, true) then
-            return true, name
-        end
-    end
-    
-    -- If it's a Kyeggo but NOT in the common list → Keeper (do NOT run)
-    if text:find("kyeggo") then
-        local found = text:match("kyeggo[%w%-]*") or "Kyeggo Variant"
-        return false, found
-    end
-    
-    return false, "Unknown"
-end
-
+-- ── FIXED: Click Run button by finding par=Run in the battle GUI ──────────────
 local function clickRunButton(battleGui)
     local vu = game:GetService("VirtualUser")
-    
+
+    -- First pass: find button whose parent is named "Run"
     if battleGui then
         for _, obj in ipairs(battleGui:GetDescendants()) do
-            if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
-                local parentName = obj.Parent and obj.Parent.Name or ""
-                local btnText = obj.Text or ""
-                
-                if parentName == "Run" or btnText:lower() == "run" then
-                    local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
-                    pcall(function()
-                        vu:Button1Down(pos, CFrame.new())
-                        task.wait(0.1)
-                        vu:Button1Up(pos, CFrame.new())
-                    end)
-                    return true
-                end
+            if (obj:IsA("TextButton") or obj:IsA("ImageButton"))
+                and obj.Parent
+                and obj.Parent.Name == "Run"
+                and obj.Visible then
+                local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
+                pcall(function()
+                    vu:Button1Down(pos, CFrame.new())
+                    task.wait(0.1)
+                    vu:Button1Up(pos, CFrame.new())
+                end)
+                return true
             end
         end
     end
 
-    -- Fallback screen click
+    -- Fallback: search all GUIs for a button parented under "Run"
+    for _, gui in ipairs(player.PlayerGui:GetChildren()) do
+        if gui.Name == "EggCollectorUI" then continue end
+        if not gui:IsA("ScreenGui") then continue end
+        for _, obj in ipairs(gui:GetDescendants()) do
+            if (obj:IsA("TextButton") or obj:IsA("ImageButton"))
+                and obj.Parent
+                and obj.Parent.Name == "Run"
+                and obj.Visible then
+                local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
+                pcall(function()
+                    vu:Button1Down(pos, CFrame.new())
+                    task.wait(0.1)
+                    vu:Button1Up(pos, CFrame.new())
+                end)
+                return true
+            end
+        end
+    end
+
+    -- Last resort: screen-coordinate click at bottom-center
     local vp = Camera.ViewportSize
     pcall(function()
-        vu:Button1Down(Vector2.new(vp.X / 2, vp.Y * 0.88), CFrame.new())
+        vu:Button1Down(Vector2.new(vp.X / 2, vp.Y * 0.90), CFrame.new())
         task.wait(0.1)
-        vu:Button1Up(Vector2.new(vp.X / 2, vp.Y * 0.88), CFrame.new())
+        vu:Button1Up(Vector2.new(vp.X / 2, vp.Y * 0.90), CFrame.new())
     end)
     return false
 end
 
 local function isBattleGui(gui)
-    if not gui:IsA("ScreenGui") or not gui.Enabled then return false end
+    if not gui:IsA("ScreenGui") then return false end
     local hasRun, hasFight, hasLoomians = false, false, false
     for _, obj in ipairs(gui:GetDescendants()) do
         if obj:IsA("TextButton") then
-            local txt = obj.Text or ""
-            if txt == "Run" then hasRun = true end
-            if txt == "Fight" then hasFight = true end
-            if txt == "Loomians" then hasLoomians = true end
+            if obj.Text == "Run"      then hasRun      = true end
+            if obj.Text == "Fight"    then hasFight    = true end
+            if obj.Text == "Loomians" then hasLoomians = true end
         end
     end
     return hasRun and hasFight and hasLoomians
@@ -693,7 +706,6 @@ local function showNotif(text, color)
     notif.BorderSizePixel = 0
     notif.Parent = screenGui
     Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 10)
-    
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -10, 1, 0)
     lbl.Position = UDim2.new(0, 5, 0, 0)
@@ -703,47 +715,57 @@ local function showNotif(text, color)
     lbl.TextScaled = true
     lbl.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
     lbl.Parent = notif
-    
     task.delay(3.5, function()
         if notif and notif.Parent then notif:Destroy() end
     end)
 end
 
 local watchedGuis = {}
+
 task.spawn(function()
     while true do
-        task.wait(0.25)
+        task.wait(0.3)
         if not autoRunEnabled then continue end
 
         for _, gui in ipairs(player.PlayerGui:GetChildren()) do
             if gui.Name == "EggCollectorUI" then continue end
             if watchedGuis[gui] then continue end
-            if not gui:IsA("ScreenGui") or not gui.Enabled then continue end
+            if not gui:IsA("ScreenGui") then continue end
+            if not gui.Enabled then continue end
 
             if isBattleGui(gui) then
                 watchedGuis[gui] = true
                 local fullText = getAllText(gui)
-                local shouldRun, reason = shouldAutoRun(fullText)
+                local keep, reason = isKeeper(fullText)
 
-                if shouldRun then
-                    -- ✅ In COMMON_KYEGGOS → Auto Run
-                    showNotif("🏃 Auto-running " .. reason:upper() .. " in 3s...", Color3.fromRGB(80, 80, 120))
-                    encounterLabel.Text = "Last: Skipped (" .. reason .. ")"
-                    encounterLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-                    
-                    task.wait(3)
-                    clickRunButton(gui)
-                    encounterLabel.Text = "Last: Skipped ✓"
-                    encounterLabel.TextColor3 = Color3.fromRGB(120, 200, 120)
-                else
-                    -- ⭐ Rare / Not in list → Keeper
+                if keep then
                     showNotif("⭐ KEEPER: " .. reason:upper() .. "! Stay!", Color3.fromRGB(255, 180, 0))
                     encounterLabel.Text = "Last: KEEPER (" .. reason .. ")"
                     encounterLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+                else
+                    showNotif("🏃 Auto-running in 3s...", Color3.fromRGB(80, 80, 120))
+                    encounterLabel.Text = "Last: Skipped (running...)"
+                    encounterLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+
+                    task.wait(3)
+
+                    -- Re-check before clicking in case GUI changed
+                    if not isKeeper(getAllText(gui)) then
+                        clickRunButton(gui)  -- pass the battle GUI directly
+                        encounterLabel.Text = "Last: Skipped ✓"
+                        encounterLabel.TextColor3 = Color3.fromRGB(120, 200, 120)
+                    end
+
+
+
+
+
                 end
 
-                task.delay(12, function() watchedGuis[gui] = nil end)
+                task.delay(10, function() watchedGuis[gui] = nil end)
             end
         end
     end
-end)llector loaded — ESP + Auto-Run (fixed Run button) ready")
+end)
+
+print("✅ Kyeggo Egg Collector loaded — ESP + Auto-Run (fixed Run button) ready")
