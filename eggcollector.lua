@@ -4,11 +4,12 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local collected = 0
 local isRunning = false
+local isMinimized = false
 
 -- ── Settings ─────────────────────────────────────────────────────────────────
 local SCAN_RADIUS      = 120   -- studs
-local COLLECT_INTERVAL = 0.4   -- seconds between sweeps
-local MAX_PER_SWEEP    = 8     -- max eggs per sweep
+local COLLECT_INTERVAL = 0.05  -- seconds between sweeps (was 0.4 — now 20x faster)
+local MAX_PER_SWEEP    = math.huge  -- no limit (was 8)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Remove old UI
@@ -40,7 +41,7 @@ titleBar.Parent = frame
 Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -40, 1, 0)
+title.Size = UDim2.new(1, -80, 1, 0)
 title.Position = UDim2.new(0, 8, 0, 0)
 title.BackgroundTransparency = 1
 title.Text = "Kyeggo Egg Collector"
@@ -49,6 +50,19 @@ title.TextScaled = true
 title.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 title.Parent = titleBar
 
+-- Minimize Button
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 28, 0, 28)
+minimizeBtn.Position = UDim2.new(1, -64, 0, 4)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(80, 150, 255)
+minimizeBtn.Text = "–"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.TextScaled = true
+minimizeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+minimizeBtn.Parent = titleBar
+Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Close Button
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 28, 0, 28)
 closeBtn.Position = UDim2.new(1, -32, 0, 4)
@@ -278,7 +292,6 @@ local function doScan(radius)
         if obj:IsA("Model")     then clr = Color3.fromRGB(255, 220, 80)  end
         if obj:IsA("Part")      then clr = Color3.fromRGB(180, 255, 180) end
 
-        -- Highlight chunk-parented eggs in bright cyan — these are our targets
         if obj:IsA("MeshPart") and obj.Name:lower():find("egg")
            and obj.Parent and obj.Parent.Name:lower():find("chunk") then
             clr = Color3.fromRGB(0, 255, 220)
@@ -317,14 +330,31 @@ setTab(false)
 tabMain.MouseButton1Click:Connect(function() setTab(false) end)
 tabDebug.MouseButton1Click:Connect(function() setTab(true) end)
 
+-- ── Minimize Logic ───────────────────────────────────────────────────────────
+-- Stores the content area (everything below the title bar)
+local contentArea = {tabFrame, mainPanel, debugPanel}
+
+minimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        -- Shrink frame to just the title bar height
+        frame.Size = UDim2.new(0, 280, 0, 35)
+        minimizeBtn.Text = "□"
+        for _, elem in ipairs(contentArea) do
+            elem.Visible = false
+        end
+    else
+        -- Restore full size
+        frame.Size = UDim2.new(0, 280, 0, 300)
+        minimizeBtn.Text = "–"
+        tabFrame.Visible = true
+        -- Restore whichever panel was active (main by default)
+        mainPanel.Visible = true
+        debugPanel.Visible = false
+    end
+end)
+
 -- ── Ground Egg Check ─────────────────────────────────────────────────────────
---[[
-    Ground eggs confirmed:
-      - MeshPart named "Egg" (case-insensitive)
-      - Parent name contains "chunk" (chunk1, chunk2, chunk3, etc.)
-    Falling/visual eggs:
-      - Same MeshPart name but parent is "camera" or similar — SKIP those
---]]
 local function isGroundEgg(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
@@ -334,6 +364,7 @@ local function isGroundEgg(obj)
 end
 
 -- ── Collection Loop ──────────────────────────────────────────────────────────
+-- No per-sweep limit, no inter-teleport waits — just raw speed
 local function collectEggs()
     if not isRunning then return end
     local char = player.Character
@@ -342,21 +373,17 @@ local function collectEggs()
     if not root then return end
 
     local originalCFrame = root.CFrame
-    local eggsFound = 0
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning then break end
-        if eggsFound >= MAX_PER_SWEEP then break end
 
         local ok, targetPos = isGroundEgg(obj)
         if ok and targetPos then
             local dist = (root.Position - targetPos).Magnitude
             if dist < SCAN_RADIUS then
-                eggsFound += 1
+                -- Teleport onto egg, then return — no waits
                 root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-                task.wait(0.12)
                 root.CFrame = originalCFrame
-                task.wait(0.08)
                 collected += 1
                 counterLabel.Text = "Eggs Collected: " .. collected
             end
