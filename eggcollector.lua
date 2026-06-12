@@ -351,9 +351,11 @@ scanBtn.MouseButton1Click:Connect(function()
             if obj:IsA("TextButton") or obj:IsA("ImageButton") then
                 -- Button: show name, text, parent, grandparent
                 local txt = obj:IsA("TextButton") and obj.Text or "(img)"
-                scanLog("  BTN  name=" .. nm, Color3.fromRGB(80, 255, 120))
-                scanLog('       txt="' .. txt .. '"  vis=' .. tostring(obj.Visible), Color3.fromRGB(80, 255, 120))
+                local pos = obj.AbsolutePosition
+                local sz  = obj.AbsoluteSize
+                scanLog("  BTN  name=" .. nm .. '  txt="' .. txt .. '"', Color3.fromRGB(80, 255, 120))
                 scanLog("       par=" .. par .. "  gpar=" .. gpar, Color3.fromRGB(60, 200, 100))
+                scanLog("       pos=(" .. math.floor(pos.X) .. "," .. math.floor(pos.Y) .. ")  size=(" .. math.floor(sz.X) .. "x" .. math.floor(sz.Y) .. ")  vis=" .. tostring(obj.Visible), Color3.fromRGB(60, 180, 80))
 
             elseif cls == "RemoteEvent" or cls == "RemoteFunction"
                 or cls == "BindableEvent" or cls == "BindableFunction" then
