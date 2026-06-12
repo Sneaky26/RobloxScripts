@@ -560,7 +560,7 @@ local function clickRunButton()
     local vu = game:GetService("VirtualUser")
     local vp = Camera.ViewportSize
     local x  = vp.X / 2
-    local y  = vp.Y * 0.85
+    local y  = vp.Y * 0.90
     local pos = Vector2.new(x, y)
     pcall(function()
         vu:Button1Down(pos, CFrame.new())
