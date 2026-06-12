@@ -381,15 +381,26 @@ espToggleBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ── NPC / Pokemon color ─────────────────────────────────────────────────────
--- Keywords that suggest a rare/special pokemon model name
-local RARE_NPC_KEYWORDS = { "rainbow", "gradient", "alpha", "gamma", "wisp", "luminami", "shiny" }
+-- Exact model names that are NOT rare — auto-run on these
+local COMMON_KYEGGOS = {
+    ["Kyeggo-rviolet"]  = true,
+    ["Kyeggo-rorange"]  = true,
+    ["Kyeggo-rred"]     = true,
+    ["Kyeggo-blue"]     = true,
+    ["Kyeggo-green"]    = true,
+    ["Kyeggo-pattern4"] = true,
+    ["Kyeggo-pattern3"] = true,
+    ["Kyeggo-pattern2"] = true,
+    ["Kyeggo-pattern1"] = true,
+    ["Kyeggo-faberge1"] = true,
+    ["Kyeggo-faberge2"] = true,
+    ["Kyeggo-faberge3"] = true,
+    ["Kyeggo"]          = true,
+}
 
-local function isRareNpc(name)
-    local low = name:lower()
-    for _, kw in ipairs(RARE_NPC_KEYWORDS) do
-        if low:find(kw) then return true end
-    end
-    return false
+-- Any Kyeggo NOT in the common list = rare, notify user
+local function isRareKyeggo(name)
+    return not COMMON_KYEGGOS[name]
 end
 
 -- Skip list — ignore these model names so ESP isn't cluttered with map junk
@@ -431,36 +442,25 @@ task.spawn(function()
         local seenParts = {}
         local npcCount  = 0
 
-        -- ── Pokemon / NPC models ──────────────────────────────────────────────
-        -- Any Model that has a Humanoid OR AnimationController inside it
-        -- (both are used by NPC/creature rigs in Roblox games)
-        -- Also skip player characters and map junk
+        -- ── Kyeggo models only ────────────────────────────────────────────────
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if not obj:IsA("Model") then continue end
-            if SKIP_NAMES[obj.Name] then continue end
+            -- Only care about models starting with "Kyeggo" (case-insensitive)
+            if not obj.Name:lower():sub(1, 6) == "kyeggo" then continue end
+            if not obj.Name:lower():find("^kyeggo") then continue end
             if isPlayerCharacter(obj) then continue end
-
-            local hasRig = obj:FindFirstChildWhichIsA("Humanoid", true)
-                        or obj:FindFirstChildWhichIsA("AnimationController", true)
-            if not hasRig then continue end
 
             local root = getModelRoot(obj)
             if not root then continue end
-
-            -- Only ESP models within 400 studs so screen isn't cluttered far away
-            local dist = distTo(root.Position)
-            if dist > 400 then continue end
 
             seenParts[root] = true
             npcCount += 1
 
             if not espLabels[root] then
-                local rare = isRareNpc(obj.Name)
-                -- Label: model name + distance
-                local distStr = string.format(" [%.0fst]", dist)
+                local rare = isRareKyeggo(obj.Name)
                 local prefix = rare and "⭐ " or "🔵 "
                 local color  = rare and espRarePokemon or espNormalPokemon
-                makeESPLabel(root, prefix .. obj.Name .. distStr, color)
+                makeESPLabel(root, prefix .. obj.Name, color)
             end
         end
 
@@ -524,12 +524,20 @@ end)
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ── Auto-Run Filter ───────────────────────────────────────────────────────────
 -- ══════════════════════════════════════════════════════════════════════════════
-local KEEPER_KEYWORDS = { "rainbow", "gradient", "alpha", "gamma", "luminami", "wisp" }
-
+-- isKeeper: scans GUI text for any Kyeggo name that is NOT in the common list
+-- Returns true + the name if it's a rare Kyeggo worth keeping
 local function isKeeper(text)
-    local lower = text:lower()
-    for _, kw in ipairs(KEEPER_KEYWORDS) do
-        if lower:find(kw) then return true, kw end
+    -- Check for exact common names first — if found, it's NOT a keeper
+    for name, _ in pairs(COMMON_KYEGGOS) do
+        if text:find(name, 1, true) then
+            return false, name
+        end
+    end
+    -- If the battle screen mentions any Kyeggo at all but it's not in common list = rare
+    if text:lower():find("kyeggo") then
+        -- Extract the Kyeggo name from text for the notification
+        local found = text:match("Kyeggo%S*") or text:match("kyeggo%S*") or "Kyeggo variant"
+        return true, found
     end
     return false, nil
 end
@@ -547,30 +555,39 @@ local function getAllText(gui)
 end
 
 local function clickRunButton(gui)
+    local target = nil
+
+    -- Pass 1: exact text "Run"
     for _, obj in ipairs(gui:GetDescendants()) do
         if obj:IsA("TextButton") and obj.Text == "Run" then
-            obj.MouseButton1Click:Fire()
-            return true, obj.Text
+            target = obj break
         end
     end
-    for _, obj in ipairs(gui:GetDescendants()) do
-        if obj:IsA("TextButton") then
-            local t = obj.Text:lower()
-            if t == "run" or t == "flee" or t == "escape" then
-                obj.MouseButton1Click:Fire()
-                return true, obj.Text
+    -- Pass 2: name contains "run"
+    if not target then
+        for _, obj in ipairs(gui:GetDescendants()) do
+            if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Name:lower():find("run") then
+                target = obj break
             end
         end
     end
-    for _, obj in ipairs(gui:GetDescendants()) do
-        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-            if obj.Name:lower():find("run") then
-                obj.MouseButton1Click:Fire()
-                return true, obj.Name
-            end
-        end
-    end
-    return false, nil
+
+    if not target then return false, nil end
+
+    -- Try all firing methods — Loomian Legacy uses a custom button handler
+    pcall(function() target.MouseButton1Click:Fire() end)
+    pcall(function() target.Activated:Fire() end)
+    -- Simulate real mouse click via VirtualUser if available
+    pcall(function()
+        local vu = game:GetService("VirtualUser")
+        local pos = target.AbsolutePosition
+        local size = target.AbsoluteSize
+        vu:Button1Down(Vector2.new(pos.X + size.X/2, pos.Y + size.Y/2), CFrame.new())
+        task.wait(0.05)
+        vu:Button1Up(Vector2.new(pos.X + size.X/2, pos.Y + size.Y/2), CFrame.new())
+    end)
+
+    return true, target.Text or target.Name
 end
 
 local function isBattleGui(gui)
