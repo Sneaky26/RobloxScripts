@@ -1,5 +1,5 @@
 -- Kyeggo Event Auto Egg + Currency Collector + Rare Notifier
--- Only collects eggs ON THE GROUND (ignores falling ones)
+-- Improved for 2026 Rainbow Dreggodyne Event
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -39,7 +39,7 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 35)
 title.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-title.Text = "Kyeggo Ground Collector"
+title.Text = "Kyeggo Egg Collector"
 title.TextColor3 = Color3.fromRGB(255, 220, 80)
 title.TextScaled = true
 title.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -88,34 +88,27 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 8)
 btnCorner.Parent = toggleBtn
 
--- Rare Notification
+-- Rare Notification Function
 local function showRareNotification(egg)
     local notif = Instance.new("TextLabel")
-    notif.Size = UDim2.new(0, 320, 0, 90)
-    notif.Position = UDim2.new(0.5, -160, 0.25, 0)
-    notif.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-    notif.Text = "🎉 RARE KYEGGO SPAWNED! 🎉\n" .. (egg.Name or "Special Egg")
+    notif.Size = UDim2.new(0, 300, 0, 80)
+    notif.Position = UDim2.new(0.5, -150, 0.3, 0)
+    notif.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    notif.Text = "🎉 RARE KYEGGO FOUND! 🎉\n" .. egg.Name
     notif.TextColor3 = Color3.fromRGB(255, 255, 100)
     notif.TextScaled = true
     notif.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
     notif.Parent = screenGui
     
     local sound = Instance.new("Sound")
-    sound.SoundId = "rbxassetid://131057809"
-    sound.Volume = 0.8
+    sound.SoundId = "rbxassetid://131057809" -- Nice alert sound
+    sound.Volume = 0.7
     sound.Parent = workspace
     sound:Play()
     
-    task.wait(4.5)
+    task.wait(4)
     notif:Destroy()
     sound:Destroy()
-end
-
-local function isRareKyeggo(egg)
-    local name = egg.Name:lower()
-    return name:find("rainbow") or name:find("faberge") or name:find("gold") or 
-           name:find("colored") or name:find("red") or name:find("blue") or 
-           name:find("green") or name:find("purple") or name:find("special")
 end
 
 -- Toggle
@@ -134,6 +127,17 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+local function isRareKyeggo(egg)
+    local name = egg.Name:lower()
+    -- Add more patterns if needed
+    if name:find("rainbow") or name:find("faberge") or name:find("colored") or 
+       name:find("gold") or name:find("red") or name:find("blue") or 
+       name:find("green") or name:find("purple") then
+        return true
+    end
+    return false
+end
+
 local function collectItems()
     if not isRunning then return end
     
@@ -147,32 +151,30 @@ local function collectItems()
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning then break end
-        if itemsFound >= 8 then break end
+        if itemsFound >= 10 then break end
 
-        -- Only MeshParts named Egg or Easter Egg
-        if (obj.Name == "Egg" or obj.Name == "Easter Egg") and obj:IsA("MeshPart") then
-            local pos = obj.Position
-            local dist = (root.Position - pos).Magnitude
-            
-            -- IMPORTANT FILTER: Only collect eggs CLOSE TO THE GROUND
-            if dist < 130 and pos.Y < 60 then  -- Adjust 60 if needed (lower = stricter)
+        local isEgg = obj.Name == "Egg" and obj:IsA("MeshPart")
+        local isCurrency = obj.Name == "Easter Egg" or (obj:IsA("Part") and obj.Name:find("Egg"))
+
+        if isEgg or isCurrency then
+            local dist = (root.Position - obj.Position).Magnitude
+            if dist < 130 then
                 itemsFound += 1
                 
-                root.CFrame = CFrame.new(pos + Vector3.new(0, 4, 0))
+                root.CFrame = CFrame.new(obj.Position + Vector3.new(0, 4, 0))
                 task.wait(0.15)
                 root.CFrame = originalCFrame
                 task.wait(0.08)
 
-                -- Egg (Kyeggo encounter)
-                if obj.Name == "Egg" then
+                if isEgg then
                     collectedEggs += 1
                     eggLabel.Text = "Eggs Collected: " .. collectedEggs
                     
+                    -- Check if rare
                     if isRareKyeggo(obj) then
                         showRareNotification(obj)
                     end
                 else
-                    -- Currency
                     collectedCurrency += 1
                     currencyLabel.Text = "Easter Eggs: " .. collectedCurrency
                 end
@@ -185,8 +187,8 @@ end
 task.spawn(function()
     while true do
         pcall(collectItems)
-        task.wait(0.4)
+        task.wait(0.35)
     end
 end)
 
-print("✅ Ground-Only Kyeggo Collector Loaded! (Ignores falling eggs)")
+print("✅ Kyeggo Collector + Currency + Rare Notifier Loaded!")
