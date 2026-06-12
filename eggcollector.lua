@@ -196,7 +196,6 @@ espPanel.BackgroundTransparency = 1
 espPanel.Visible = false
 espPanel.Parent = frame
 
--- ESP toggle button
 local espToggleBtn = Instance.new("TextButton")
 espToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
 espToggleBtn.Position = UDim2.new(0.1, 0, 0, 10)
@@ -208,7 +207,6 @@ espToggleBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enu
 espToggleBtn.Parent = espPanel
 Instance.new("UICorner", espToggleBtn).CornerRadius = UDim.new(0, 8)
 
--- Legend
 local function makeLegend(text, color, yPos)
     local dot = Instance.new("Frame")
     dot.Size = UDim2.new(0, 10, 0, 10)
@@ -230,8 +228,8 @@ local function makeLegend(text, color, yPos)
     lbl.Parent = espPanel
 end
 
-local espNormalPokemon = Color3.fromRGB(255, 120, 50)  -- orange     = normal pokemon
-local espRarePokemon   = Color3.fromRGB(255, 80, 255)  -- magenta    = rare variant (rainbow/gradient/alpha/gamma/wisp)
+local espNormalPokemon = Color3.fromRGB(255, 120, 50)
+local espRarePokemon   = Color3.fromRGB(255, 80, 255)
 
 local espInfoLabel = Instance.new("TextLabel")
 espInfoLabel.Size = UDim2.new(1, -10, 0, 16)
@@ -244,7 +242,7 @@ espInfoLabel.Font = Enum.Font.Code
 espInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 espInfoLabel.Parent = espPanel
 
-makeLegend("Normal Pokemon",                    espNormalPokemon, 72)
+makeLegend("Normal Pokemon",                     espNormalPokemon, 72)
 makeLegend("Rare (Rainbow/Gradient/Alpha/etc.)", espRarePokemon,   94)
 
 local espCountLabel = Instance.new("TextLabel")
@@ -331,17 +329,15 @@ scanBtn.MouseButton1Click:Connect(function()
 
     local guiCount = 0
 
-    -- GetDescendants on PlayerGui catches everything including folders/subguis
     for _, gui in ipairs(player.PlayerGui:GetDescendants()) do
         if not gui:IsA("ScreenGui") then continue end
         if gui.Name == "EggCollectorUI" then continue end
 
         guiCount += 1
-        scanLog("", Color3.fromRGB(255,255,255)) -- spacer
+        scanLog("", Color3.fromRGB(255,255,255))
         scanLog("GUI: " .. gui.Name .. " enabled=" .. tostring(gui.Enabled),
             Color3.fromRGB(100, 200, 255))
 
-        -- Dump every single descendant with full path info — nothing filtered out
         for _, obj in ipairs(gui:GetDescendants()) do
             local cls = obj.ClassName
             local nm  = obj.Name
@@ -349,7 +345,6 @@ scanBtn.MouseButton1Click:Connect(function()
             local gpar = (obj.Parent and obj.Parent.Parent) and obj.Parent.Parent.Name or "?"
 
             if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                -- Button: show name, text, parent, grandparent
                 local txt = obj:IsA("TextButton") and obj.Text or "(img)"
                 local pos = obj.AbsolutePosition
                 local sz  = obj.AbsoluteSize
@@ -359,7 +354,6 @@ scanBtn.MouseButton1Click:Connect(function()
 
             elseif cls == "RemoteEvent" or cls == "RemoteFunction"
                 or cls == "BindableEvent" or cls == "BindableFunction" then
-                -- Remotes are the key to firing Run without clicking
                 scanLog("  *** " .. cls .. " name=" .. nm .. " par=" .. par .. " ***",
                     Color3.fromRGB(255, 60, 60))
 
@@ -421,22 +415,12 @@ end)
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ── ESP System ───────────────────────────────────────────────────────────────
--- Uses BillboardGuis attached directly to parts so labels float above objects
--- in world-space. Much cleaner than screen-space projection.
 -- ══════════════════════════════════════════════════════════════════════════════
 
-local espLabels = {}  -- [part] = BillboardGui
-
-local function isGroundEgg(obj)
-    if not obj:IsA("MeshPart") then return false end
-    if not obj.Name:lower():find("egg") then return false end
-    if not obj.Parent then return false end
-    if not obj.Parent.Name:lower():find("chunk") then return false end
-    return true
-end
+local espLabels = {}
 
 local function makeESPLabel(part, text, color)
-    if espLabels[part] then return end  -- already has one
+    if espLabels[part] then return end
 
     local bb = Instance.new("BillboardGui")
     bb.Name = "KyeggoESP"
@@ -445,7 +429,7 @@ local function makeESPLabel(part, text, color)
     bb.AlwaysOnTop = true
     bb.MaxDistance = 300
     bb.Adornee = part
-    bb.Parent = part  -- parent to part so it auto-removes when part does
+    bb.Parent = part
 
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 1, 0)
@@ -455,7 +439,6 @@ local function makeESPLabel(part, text, color)
     bg.Parent = bb
     Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 5)
 
-    -- Coloured left stripe
     local stripe = Instance.new("Frame")
     stripe.Size = UDim2.new(0, 4, 1, 0)
     stripe.BackgroundColor3 = color
@@ -506,8 +489,6 @@ espToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ── NPC / Pokemon color ─────────────────────────────────────────────────────
--- Exact model names that are NOT rare — auto-run on these
 local COMMON_KYEGGOS = {
     ["Kyeggo-rviolet"]  = true,
     ["Kyeggo-rorange"]  = true,
@@ -524,17 +505,9 @@ local COMMON_KYEGGOS = {
     ["Kyeggo"]          = true,
 }
 
--- Any Kyeggo NOT in the common list = rare, notify user
 local function isRareKyeggo(name)
     return not COMMON_KYEGGOS[name]
 end
-
--- Skip list — ignore these model names so ESP isn't cluttered with map junk
-local SKIP_NAMES = {
-    ["Baseplate"] = true, ["Terrain"] = true, ["Camera"] = true,
-    ["SpawnLocation"] = true, ["Sky"] = true, ["Lighting"] = true,
-    ["SunRaysEffect"] = true, ["Atmosphere"] = true,
-}
 
 local function isPlayerCharacter(model)
     for _, p in ipairs(Players:GetPlayers()) do
@@ -543,23 +516,12 @@ local function isPlayerCharacter(model)
     return false
 end
 
--- Get the root part of a model to attach ESP to
 local function getModelRoot(model)
     if model.PrimaryPart then return model.PrimaryPart end
     local h = model:FindFirstChildWhichIsA("BasePart", true)
     return h
 end
 
--- Get distance from local player to a position
-local function distTo(pos)
-    local char = player.Character
-    if not char then return 9999 end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return 9999 end
-    return (root.Position - pos).Magnitude
-end
-
--- Refresh ESP every 0.5s
 task.spawn(function()
     while true do
         task.wait(0.5)
@@ -568,11 +530,8 @@ task.spawn(function()
         local seenParts = {}
         local npcCount  = 0
 
-        -- ── Kyeggo models only ────────────────────────────────────────────────
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if not obj:IsA("Model") then continue end
-            -- Only care about models starting with "Kyeggo" (case-insensitive)
-            if not obj.Name:lower():sub(1, 6) == "kyeggo" then continue end
             if not obj.Name:lower():find("^kyeggo") then continue end
             if isPlayerCharacter(obj) then continue end
 
@@ -590,7 +549,6 @@ task.spawn(function()
             end
         end
 
-        -- Remove stale labels
         for part, _ in pairs(espLabels) do
             if not seenParts[part] or not part.Parent then
                 removeESPLabel(part)
@@ -602,7 +560,7 @@ task.spawn(function()
 end)
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- ── Ground Egg Check (collection) ────────────────────────────────────────────
+-- ── Ground Egg Collection ─────────────────────────────────────────────────────
 -- ══════════════════════════════════════════════════════════════════════════════
 local function isGroundEggPos(obj)
     if not obj:IsA("MeshPart") then return false, nil end
@@ -612,7 +570,6 @@ local function isGroundEggPos(obj)
     return true, obj.Position
 end
 
--- ── Collection Loop ───────────────────────────────────────────────────────────
 local function collectEggs()
     if not isRunning then return end
     local char = player.Character
@@ -648,20 +605,16 @@ task.spawn(function()
 end)
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- ── Auto-Run Filter ───────────────────────────────────────────────────────────
+-- ── Auto-Run System ───────────────────────────────────────────────────────────
 -- ══════════════════════════════════════════════════════════════════════════════
--- isKeeper: scans GUI text for any Kyeggo name that is NOT in the common list
--- Returns true + the name if it's a rare Kyeggo worth keeping
+
 local function isKeeper(text)
-    -- Check for exact common names first — if found, it's NOT a keeper
     for name, _ in pairs(COMMON_KYEGGOS) do
         if text:find(name, 1, true) then
             return false, name
         end
     end
-    -- If the battle screen mentions any Kyeggo at all but it's not in common list = rare
     if text:lower():find("kyeggo") then
-        -- Extract the Kyeggo name from text for the notification
         local found = text:match("Kyeggo%S*") or text:match("kyeggo%S*") or "Kyeggo variant"
         return true, found
     end
@@ -680,20 +633,56 @@ local function getAllText(gui)
     return table.concat(texts, " ")
 end
 
-local function clickRunButton()
-    -- Run button is always at bottom-center of screen (from screenshot)
-    -- Screen center-X, roughly 85% down the screen
+-- ── FIXED: Click Run button by finding par=Run in the battle GUI ──────────────
+local function clickRunButton(battleGui)
     local vu = game:GetService("VirtualUser")
+
+    -- First pass: find button whose parent is named "Run"
+    if battleGui then
+        for _, obj in ipairs(battleGui:GetDescendants()) do
+            if (obj:IsA("TextButton") or obj:IsA("ImageButton"))
+                and obj.Parent
+                and obj.Parent.Name == "Run"
+                and obj.Visible then
+                local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
+                pcall(function()
+                    vu:Button1Down(pos, CFrame.new())
+                    task.wait(0.1)
+                    vu:Button1Up(pos, CFrame.new())
+                end)
+                return true
+            end
+        end
+    end
+
+    -- Fallback: search all GUIs for a button parented under "Run"
+    for _, gui in ipairs(player.PlayerGui:GetChildren()) do
+        if gui.Name == "EggCollectorUI" then continue end
+        if not gui:IsA("ScreenGui") then continue end
+        for _, obj in ipairs(gui:GetDescendants()) do
+            if (obj:IsA("TextButton") or obj:IsA("ImageButton"))
+                and obj.Parent
+                and obj.Parent.Name == "Run"
+                and obj.Visible then
+                local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
+                pcall(function()
+                    vu:Button1Down(pos, CFrame.new())
+                    task.wait(0.1)
+                    vu:Button1Up(pos, CFrame.new())
+                end)
+                return true
+            end
+        end
+    end
+
+    -- Last resort: screen-coordinate click at bottom-center
     local vp = Camera.ViewportSize
-    local x  = vp.X / 2
-    local y  = vp.Y * 0.90
-    local pos = Vector2.new(x, y)
     pcall(function()
-        vu:Button1Down(pos, CFrame.new())
+        vu:Button1Down(Vector2.new(vp.X / 2, vp.Y * 0.90), CFrame.new())
         task.wait(0.1)
-        vu:Button1Up(pos, CFrame.new())
+        vu:Button1Up(Vector2.new(vp.X / 2, vp.Y * 0.90), CFrame.new())
     end)
-    return true
+    return false
 end
 
 local function isBattleGui(gui)
@@ -760,9 +749,11 @@ task.spawn(function()
 
                     task.wait(3)
 
+                    -- Re-check before clicking in case GUI changed
                     if not isKeeper(getAllText(gui)) then
-                        clickRunButton()
+                        clickRunButton(gui)  -- pass the battle GUI directly
                         encounterLabel.Text = "Last: Skipped ✓"
+                        encounterLabel.TextColor3 = Color3.fromRGB(120, 200, 120)
                     end
                 end
 
@@ -772,4 +763,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ Kyeggo Egg Collector loaded — ESP + Auto-Run ready")
+print("✅ Kyeggo Egg Collector loaded — ESP + Auto-Run (fixed Run button) ready")
