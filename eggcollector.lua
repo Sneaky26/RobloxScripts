@@ -24,6 +24,7 @@ screenGui.Name = "EggCollectorUI"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 999
 screenGui.Parent = player.PlayerGui
 
 -- ── Main Frame ───────────────────────────────────────────────────────────────
@@ -326,56 +327,52 @@ end
 
 scanBtn.MouseButton1Click:Connect(function()
     clearScanLog()
-    scanLog("=== Scanning all ScreenGuis ===", Color3.fromRGB(255, 220, 80))
+    scanLog("=== BATTLE GUI SCAN ===", Color3.fromRGB(255, 220, 80))
 
     local guiCount = 0
-    for _, gui in ipairs(player.PlayerGui:GetChildren()) do
-        if gui.Name == "EggCollectorUI" then continue end
-        if not gui:IsA("ScreenGui") then continue end
-        guiCount += 1
-        scanLog("── GUI: " .. gui.Name .. " (enabled=" .. tostring(gui.Enabled) .. ")",
-            Color3.fromRGB(100, 180, 255))
 
+    -- GetDescendants on PlayerGui catches everything including folders/subguis
+    for _, gui in ipairs(player.PlayerGui:GetDescendants()) do
+        if not gui:IsA("ScreenGui") then continue end
+        if gui.Name == "EggCollectorUI" then continue end
+
+        guiCount += 1
+        scanLog("", Color3.fromRGB(255,255,255)) -- spacer
+        scanLog("GUI: " .. gui.Name .. " enabled=" .. tostring(gui.Enabled),
+            Color3.fromRGB(100, 200, 255))
+
+        -- Dump every single descendant with full path info — nothing filtered out
         for _, obj in ipairs(gui:GetDescendants()) do
             local cls = obj.ClassName
             local nm  = obj.Name
-            local extra = ""
+            local par  = obj.Parent and obj.Parent.Name or "?"
+            local gpar = (obj.Parent and obj.Parent.Parent) and obj.Parent.Parent.Name or "?"
 
-            -- TextButton: show text + any script children
             if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                local txt = obj:IsA("TextButton") and (' "' .. obj.Text .. '"') or ""
-                local scripts = {}
-                for _, c in ipairs(obj:GetChildren()) do
-                    if c:IsA("LocalScript") or c:IsA("Script") then
-                        table.insert(scripts, c.Name)
-                    end
-                end
-                extra = txt
-                if #scripts > 0 then extra = extra .. " SCR:[" .. table.concat(scripts,",") .. "]" end
-                local par  = obj.Parent and obj.Parent.Name or "nil"
-                local gpar = (obj.Parent and obj.Parent.Parent) and obj.Parent.Parent.Name or "nil"
-                scanLog("  BTN [" .. nm .. '] txt="' .. obj.Text .. '"', Color3.fromRGB(80, 255, 120))
-                scanLog("    parent=" .. par .. "  gparent=" .. gpar, Color3.fromRGB(80, 200, 100))
+                -- Button: show name, text, parent, grandparent
+                local txt = obj:IsA("TextButton") and obj.Text or "(img)"
+                scanLog("  BTN  name=" .. nm, Color3.fromRGB(80, 255, 120))
+                scanLog('       txt="' .. txt .. '"  vis=' .. tostring(obj.Visible), Color3.fromRGB(80, 255, 120))
+                scanLog("       par=" .. par .. "  gpar=" .. gpar, Color3.fromRGB(60, 200, 100))
 
-            -- RemoteEvent / RemoteFunction — this is the jackpot
-            elseif cls == "RemoteEvent" or cls == "RemoteFunction" or cls == "BindableEvent" or cls == "BindableFunction" then
-                scanLog("  *** " .. cls .. ": " .. nm .. " ***", Color3.fromRGB(255, 80, 80))
+            elseif cls == "RemoteEvent" or cls == "RemoteFunction"
+                or cls == "BindableEvent" or cls == "BindableFunction" then
+                -- Remotes are the key to firing Run without clicking
+                scanLog("  *** " .. cls .. " name=" .. nm .. " par=" .. par .. " ***",
+                    Color3.fromRGB(255, 60, 60))
 
-            -- LocalScript — note its name
             elseif obj:IsA("LocalScript") or obj:IsA("Script") then
-                scanLog("  SCR: " .. nm, Color3.fromRGB(255, 180, 80))
-
-            -- Frame/other containers — just note name/class briefly
-            elseif obj:IsA("Frame") or obj:IsA("ScrollingFrame") then
-                scanLog("  frm " .. nm .. " (" .. cls .. ")", Color3.fromRGB(140, 140, 160))
+                scanLog("  SCR  name=" .. nm .. "  par=" .. par,
+                    Color3.fromRGB(255, 180, 60))
             end
         end
     end
 
+    scanLog("", Color3.fromRGB(255,255,255))
     if guiCount == 0 then
-        scanLog("No ScreenGuis found! Open a battle first.", Color3.fromRGB(255, 100, 80))
+        scanLog("Nothing found — make sure you are IN a battle!", Color3.fromRGB(255, 80, 80))
     else
-        scanLog("=== Done. " .. guiCount .. " GUIs scanned ===", Color3.fromRGB(255, 220, 80))
+        scanLog("=== Done. " .. guiCount .. " ScreenGui(s) scanned ===", Color3.fromRGB(255, 220, 80))
     end
 end)
 
@@ -713,7 +710,7 @@ end
 local function showNotif(text, color)
     local notif = Instance.new("Frame")
     notif.Size = UDim2.new(0, 260, 0, 44)
-    notif.Position = UDim2.new(0.5, -130, 1, -60)
+    notif.Position = UDim2.new(0.5, -130, 0, 10)
     notif.BackgroundColor3 = color or Color3.fromRGB(30, 30, 45)
     notif.BorderSizePixel = 0
     notif.Parent = screenGui
