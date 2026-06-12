@@ -5,6 +5,12 @@ local player = Players.LocalPlayer
 local collected = 0
 local isRunning = false
 
+-- ── Settings ─────────────────────────────────────────────────────────────────
+local SCAN_RADIUS      = 120   -- studs
+local COLLECT_INTERVAL = 0.4   -- seconds between sweeps
+local MAX_PER_SWEEP    = 8     -- max eggs per sweep
+-- ─────────────────────────────────────────────────────────────────────────────
+
 -- Remove old UI
 local old = player.PlayerGui:FindFirstChild("EggCollectorUI")
 if old then old:Destroy() end
@@ -139,20 +145,17 @@ debugPanel.BackgroundTransparency = 1
 debugPanel.Visible = false
 debugPanel.Parent = frame
 
--- Radius label + slider row
 local radiusLabel = Instance.new("TextLabel")
 radiusLabel.Size = UDim2.new(1, -10, 0, 18)
 radiusLabel.Position = UDim2.new(0, 5, 0, 4)
 radiusLabel.BackgroundTransparency = 1
-radiusLabel.Text = "Scan radius: 20 studs  (stand NEXT to a ground egg first!)"
+radiusLabel.Text = "Stand next to a ground egg, then scan 20st"
 radiusLabel.TextColor3 = Color3.fromRGB(180, 200, 255)
 radiusLabel.TextSize = 10
 radiusLabel.Font = Enum.Font.Code
 radiusLabel.TextXAlignment = Enum.TextXAlignment.Left
-radiusLabel.TextWrapped = true
 radiusLabel.Parent = debugPanel
 
--- Two scan buttons side by side
 local btnNear = Instance.new("TextButton")
 btnNear.Size = UDim2.new(0.44, 0, 0, 26)
 btnNear.Position = UDim2.new(0.03, 0, 0, 26)
@@ -175,7 +178,6 @@ btnFar.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.Font
 btnFar.Parent = debugPanel
 Instance.new("UICorner", btnFar).CornerRadius = UDim.new(0, 6)
 
--- Scrolling log
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Size = UDim2.new(1, -8, 0, 195)
 scrollFrame.Position = UDim2.new(0, 4, 0, 58)
@@ -219,25 +221,16 @@ local function addLog(text, color)
     scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.CanvasSize.Y.Offset)
 end
 
--- ── THE BROAD SCAN ───────────────────────────────────────────────────────────
---[[
-    This scan has ZERO name filter.
-    It prints EVERYTHING within range, sorted by distance.
-    Walk right up to a ground egg, hit "Scan 20st", and read what's closest.
-    That will tell us the REAL name and class of the collectable.
---]]
 local function doScan(radius)
     local char = player.Character
     if not char then addLog("No character!", Color3.fromRGB(255,80,80)) return end
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then addLog("No HumanoidRootPart!", Color3.fromRGB(255,80,80)) return end
 
-    -- Collect all nearby objects with their distances
     local nearby = {}
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        -- Skip UI, sounds, scripts, lighting etc — only physical + model objects
         if obj:IsA("BasePart") or obj:IsA("Model") then
-            local pos = nil
+            local pos
             if obj:IsA("BasePart") then
                 pos = obj.Position
             elseif obj:IsA("Model") then
@@ -257,66 +250,47 @@ local function doScan(radius)
         end
     end
 
-    -- Sort by distance ascending
     table.sort(nearby, function(a, b) return a.dist < b.dist end)
-
-    addLog(string.format("── Scan r=%d: %d objects ──", radius, #nearby), Color3.fromRGB(255,220,80))
+    addLog(string.format("── Scan r=%dst: %d objects ──", radius, #nearby), Color3.fromRGB(255,220,80))
 
     for _, entry in ipairs(nearby) do
         local obj  = entry.obj
         local dist = entry.dist
         local pos  = entry.pos
-
         local parentName = obj.Parent and obj.Parent.Name or "nil"
-
-        -- Extra info for BaseParts
         local extra = ""
         if obj:IsA("BasePart") then
             local speed = obj.AssemblyLinearVelocity.Magnitude
-            local anchored = obj.Anchored and "A" or "U"  -- Anchored / Unanchored
-            extra = string.format(" Y=%.1f V=%.1f %s", pos.Y, speed, anchored)
-
-            -- Flag any collectability hints
+            local anch  = obj.Anchored and "A" or "U"
+            extra = string.format(" Y=%.1f V=%.1f %s", pos.Y, speed, anch)
             local hints = {}
-            if obj:FindFirstChildWhichIsA("Script") or obj:FindFirstChildWhichIsA("LocalScript") then
-                table.insert(hints, "SCR")
-            end
             if obj:FindFirstChildOfClass("ClickDetector")   then table.insert(hints, "CLICK") end
             if obj:FindFirstChildOfClass("ProximityPrompt") then table.insert(hints, "PROX")  end
             if obj:FindFirstChildOfClass("TouchInterest")   then table.insert(hints, "TOUCH") end
-            if obj:FindFirstChildOfClass("BoolValue")
-            or obj:FindFirstChildOfClass("StringValue")
-            or obj:FindFirstChildOfClass("IntValue")        then table.insert(hints, "VAL")   end
-            if #hints > 0 then
-                extra = extra .. " [" .. table.concat(hints, ",") .. "]"
+            if obj:FindFirstChildWhichIsA("Script") or obj:FindFirstChildWhichIsA("LocalScript") then
+                table.insert(hints, "SCR")
             end
+            if #hints > 0 then extra = extra .. " [" .. table.concat(hints,",") .. "]" end
         end
 
-        -- Colour by class
-        local clr = Color3.fromRGB(180, 180, 180)  -- grey  = generic Part
-        if obj:IsA("MeshPart")       then clr = Color3.fromRGB(120, 160, 255) end -- blue  = MeshPart
-        if obj:IsA("Model")          then clr = Color3.fromRGB(255, 220, 80)  end -- yellow= Model
-        if obj:IsA("UnionOperation") then clr = Color3.fromRGB(255, 160, 80)  end -- orange= Union
-        if obj:IsA("SpecialMesh") or obj:IsA("Part") then
-            clr = Color3.fromRGB(180, 255, 180)  -- green = plain Part
+        local clr = Color3.fromRGB(180, 180, 180)
+        if obj:IsA("MeshPart")  then clr = Color3.fromRGB(120, 160, 255) end
+        if obj:IsA("Model")     then clr = Color3.fromRGB(255, 220, 80)  end
+        if obj:IsA("Part")      then clr = Color3.fromRGB(180, 255, 180) end
+
+        -- Highlight chunk-parented eggs in bright cyan — these are our targets
+        if obj:IsA("MeshPart") and obj.Name:lower():find("egg")
+           and obj.Parent and obj.Parent.Name:lower():find("chunk") then
+            clr = Color3.fromRGB(0, 255, 220)
+            extra = extra .. " ← GROUND EGG ✅"
         end
 
-        addLog(
-            string.format("%.1fst | %s (%s) | ^%s%s",
-                dist, obj.Name, obj.ClassName, parentName, extra),
-            clr
-        )
+        addLog(string.format("%.1fst | %s (%s) | ^%s%s",
+            dist, obj.Name, obj.ClassName, parentName, extra), clr)
     end
 
     if #nearby == 0 then
-        addLog("Nothing found in range. Move closer!", Color3.fromRGB(255,150,80))
-    else
-        addLog("── Legend: blue=MeshPart  green=Part  yellow=Model  orange=Union ──",
-            Color3.fromRGB(100,100,100))
-        addLog("── A=Anchored  U=Unanchored  V=velocity  [SCR/CLICK/PROX/TOUCH/VAL]=hints ──",
-            Color3.fromRGB(100,100,100))
-        addLog("Stand RIGHT next to a ground egg & scan at 20st for the closest hit.",
-            Color3.fromRGB(100,100,100))
+        addLog("Nothing found. Move closer!", Color3.fromRGB(255,150,80))
     end
 end
 
@@ -343,11 +317,58 @@ setTab(false)
 tabMain.MouseButton1Click:Connect(function() setTab(false) end)
 tabDebug.MouseButton1Click:Connect(function() setTab(true) end)
 
--- ── Placeholder Collection Loop (disabled until we know the real egg name) ───
+-- ── Ground Egg Check ─────────────────────────────────────────────────────────
+--[[
+    Ground eggs confirmed:
+      - MeshPart named "Egg" (case-insensitive)
+      - Parent name contains "chunk" (chunk1, chunk2, chunk3, etc.)
+    Falling/visual eggs:
+      - Same MeshPart name but parent is "camera" or similar — SKIP those
+--]]
+local function isGroundEgg(obj)
+    if not obj:IsA("MeshPart") then return false, nil end
+    if not obj.Name:lower():find("egg") then return false, nil end
+    if not obj.Parent then return false, nil end
+    if not obj.Parent.Name:lower():find("chunk") then return false, nil end
+    return true, obj.Position
+end
+
+-- ── Collection Loop ──────────────────────────────────────────────────────────
+local function collectEggs()
+    if not isRunning then return end
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local originalCFrame = root.CFrame
+    local eggsFound = 0
+
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if not isRunning then break end
+        if eggsFound >= MAX_PER_SWEEP then break end
+
+        local ok, targetPos = isGroundEgg(obj)
+        if ok and targetPos then
+            local dist = (root.Position - targetPos).Magnitude
+            if dist < SCAN_RADIUS then
+                eggsFound += 1
+                root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                task.wait(0.12)
+                root.CFrame = originalCFrame
+                task.wait(0.08)
+                collected += 1
+                counterLabel.Text = "Eggs Collected: " .. collected
+            end
+        end
+    end
+end
+
 task.spawn(function()
     while true do
-        task.wait(0.4)
+        pcall(collectEggs)
+        task.wait(COLLECT_INTERVAL)
     end
 end)
 
-print("✅ Kyeggo Egg Collector loaded — use Debug tab to identify ground egg objects!")
+print("✅ Kyeggo Egg Collector loaded! Ground egg rule: MeshPart named 'Egg' parented to 'chunk*'")
