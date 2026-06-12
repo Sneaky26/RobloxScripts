@@ -1,109 +1,144 @@
--- Egg Name Finder (On Screen Display)
+-- Kyeggo Event Auto Egg Collector (UPDATED WITH REAL EGG NAME)
 -- Works with Delta Executor on Android
 
-local Players = game:GetService("Players")
+local Players   = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local player = Players.LocalPlayer
+local player    = Players.LocalPlayer
 
--- Remove old gui if exists
-local old = player.PlayerGui:FindFirstChild("EggFinderUI")
+local collected = 0
+local isRunning = false
+
+-- Remove old UI if exists
+local old = player.PlayerGui:FindFirstChild("EggCollectorUI")
 if old then old:Destroy() end
 
 -- ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EggFinderUI"
-screenGui.ResetOnSpawn = false
+screenGui.Name           = "EggCollectorUI"
+screenGui.ResetOnSpawn   = false
 screenGui.IgnoreGuiInset = true
-screenGui.Parent = player.PlayerGui
+screenGui.Parent         = player.PlayerGui
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size             = UDim2.new(0, 220, 0, 130)
+frame.Position         = UDim2.new(0.5, -110, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+frame.BorderSizePixel  = 0
+frame.Active           = true
+frame.Draggable        = true
+frame.Parent           = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = frame
 
 -- Title
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 300, 0, 35)
-titleLabel.Position = UDim2.new(0, 10, 0, 10)
-titleLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-titleLabel.BorderSizePixel = 0
-titleLabel.Text = "Egg Name Finder"
-titleLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
-titleLabel.TextScaled = true
-titleLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-titleLabel.Parent = screenGui
+local title = Instance.new("TextLabel")
+title.Size             = UDim2.new(1, 0, 0, 35)
+title.Position         = UDim2.new(0, 0, 0, 0)
+title.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+title.BorderSizePixel  = 0
+title.Text             = "Kyeggo Egg Collector"
+title.TextColor3       = Color3.fromRGB(255, 220, 80)
+title.TextScaled       = true
+title.FontFace         = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+title.Parent           = frame
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 8)
-titleCorner.Parent = titleLabel
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = title
 
--- Scrolling Frame
-local frame = Instance.new("ScrollingFrame")
-frame.Size = UDim2.new(0, 300, 0, 400)
-frame.Position = UDim2.new(0, 10, 0, 50)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-frame.BorderSizePixel = 0
-frame.ScrollBarThickness = 6
-frame.CanvasSize = UDim2.new(0, 0, 0, 0)
-frame.Parent = screenGui
+-- Counter Label
+local counterLabel = Instance.new("TextLabel")
+counterLabel.Size                   = UDim2.new(1, 0, 0, 25)
+counterLabel.Position               = UDim2.new(0, 0, 0, 43)
+counterLabel.BackgroundTransparency = 1
+counterLabel.Text                   = "Eggs Collected: 0"
+counterLabel.TextColor3             = Color3.fromRGB(200, 200, 200)
+counterLabel.TextScaled             = true
+counterLabel.FontFace               = Font.new("rbxasset://fonts/families/GothamSSm.json")
+counterLabel.Parent                 = frame
 
-local frameCorner = Instance.new("UICorner")
-frameCorner.CornerRadius = UDim.new(0, 8)
-frameCorner.Parent = frame
+-- Status Label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size                   = UDim2.new(1, 0, 0, 20)
+statusLabel.Position               = UDim2.new(0, 0, 0, 68)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text                   = "Status: OFF"
+statusLabel.TextColor3             = Color3.fromRGB(255, 80, 80)
+statusLabel.TextScaled             = true
+statusLabel.FontFace               = Font.new("rbxasset://fonts/families/GothamSSm.json")
+statusLabel.Parent                 = frame
 
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 2)
-layout.Parent = frame
+-- Toggle Button
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size             = UDim2.new(0.7, 0, 0, 30)
+toggleBtn.Position         = UDim2.new(0.15, 0, 0, 92)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+toggleBtn.BorderSizePixel  = 0
+toggleBtn.Text             = "START"
+toggleBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+toggleBtn.TextScaled       = true
+toggleBtn.FontFace         = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+toggleBtn.Parent           = frame
 
--- Scan workspace
-local count = 0
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleBtn
 
-for _, obj in Workspace:GetDescendants() do
-    local name = obj.Name:lower()
-    if name:find("egg") or name:find("kyeg") or name:find("item") 
-    or name:find("drop") or name:find("pickup") or name:find("collect") then
-        count = count + 1
+-- Toggle Logic
+toggleBtn.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    if isRunning then
+        toggleBtn.Text             = "STOP"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+        statusLabel.Text           = "Status: ON"
+        statusLabel.TextColor3     = Color3.fromRGB(80, 255, 80)
+    else
+        toggleBtn.Text             = "START"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        statusLabel.Text           = "Status: OFF"
+        statusLabel.TextColor3     = Color3.fromRGB(255, 80, 80)
+    end
+end)
 
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 0, 32)
-        label.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-        label.BorderSizePixel = 0
-        label.Text = obj.Name .. " | " .. obj.ClassName
-        label.TextColor3 = Color3.fromRGB(255, 220, 80)
-        label.TextScaled = true
-        label.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
-        label.Parent = frame
+-- Main collect function
+-- UPDATED: targets "Egg" MeshParts only, skips ParticleEmitters
+local function collectEggs()
+    if not isRunning then return end
 
-        local labelCorner = Instance.new("UICorner")
-        labelCorner.CornerRadius = UDim.new(0, 4)
-        labelCorner.Parent = label
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-        frame.CanvasSize = UDim2.new(0, 0, 0, count * 34)
+    for _, obj in Workspace:GetDescendants() do
+        if not isRunning then break end
+
+        -- UPDATED: exact name match "Egg" and must be MeshPart
+        if obj.Name == "Egg" and obj:IsA("MeshPart") then
+            local dist = (root.Position - obj.Position).Magnitude
+
+            if dist < 60 then
+                pcall(function()
+                    firetouchinterest(root, obj, 0) -- touch
+                    task.wait(0.1)
+                    firetouchinterest(root, obj, 1) -- release
+                end)
+
+                task.wait(0.15)
+                collected = collected + 1
+                counterLabel.Text = "Eggs Collected: " .. collected
+            end
+        end
     end
 end
 
--- Nothing found message
-if count == 0 then
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 32)
-    label.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    label.BorderSizePixel = 0
-    label.Text = "Nothing found! Wait for eggs to spawn"
-    label.TextColor3 = Color3.fromRGB(255, 80, 80)
-    label.TextScaled = true
-    label.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
-    label.Parent = frame
-
-    frame.CanvasSize = UDim2.new(0, 0, 0, 32)
-end
-
--- Counter label at bottom
-local countLabel = Instance.new("TextLabel")
-countLabel.Size = UDim2.new(0, 300, 0, 25)
-countLabel.Position = UDim2.new(0, 10, 0, 455)
-countLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-countLabel.BorderSizePixel = 0
-countLabel.Text = "Found: " .. count .. " objects"
-countLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-countLabel.TextScaled = true
-countLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
-countLabel.Parent = screenGui
-
-local countCorner = Instance.new("UICorner")
-countCorner.CornerRadius = UDim.new(0, 8)
-countCorner.Parent = countLabel
+-- Run on separate thread so UI stays responsive
+task.spawn(function()
+    while true do
+        pcall(collectEggs)
+        task.wait(0.5)
+    end
+end)
