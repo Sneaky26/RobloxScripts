@@ -480,35 +480,54 @@ local function getAllText(gui)
 end
 
 -- Find and click the Run button inside a GUI
+-- From screenshot: battle menu has exactly "Fight", "Items", "Loomians", "Run"
 local function clickRunButton(gui)
+    -- Pass 1: exact text match "Run" (most reliable)
     for _, obj in ipairs(gui:GetDescendants()) do
-        if (obj:IsA("TextButton") or obj:IsA("ImageButton")) then
-            local name  = obj.Name:lower()
-            local txt   = obj:IsA("TextButton") and obj.Text:lower() or ""
-            if name:find("run") or txt:find("run")
-            or name:find("flee") or txt:find("flee")
-            or name:find("escape") or txt:find("escape") then
-                -- Fire the button
-                local click = obj:FindFirstChildOfClass("ClickDetector")
-                if click then
-                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(
-                        obj.AbsolutePosition.X + obj.AbsoluteSize.X/2,
-                        obj.AbsolutePosition.Y + obj.AbsoluteSize.Y/2,
-                        0, true, game, 0)
-                    task.wait(0.05)
-                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(
-                        obj.AbsolutePosition.X + obj.AbsoluteSize.X/2,
-                        obj.AbsolutePosition.Y + obj.AbsoluteSize.Y/2,
-                        0, false, game, 0)
-                else
-                    -- Fallback: fire MouseButton1Click directly
-                    obj.MouseButton1Click:Fire()
-                end
-                return true
+        if obj:IsA("TextButton") then
+            if obj.Text == "Run" then
+                obj.MouseButton1Click:Fire()
+                return true, obj.Text
             end
         end
     end
-    return false
+    -- Pass 2: case-insensitive text match
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if obj:IsA("TextButton") then
+            local t = obj.Text:lower()
+            if t == "run" or t == "flee" or t == "escape" then
+                obj.MouseButton1Click:Fire()
+                return true, obj.Text
+            end
+        end
+    end
+    -- Pass 3: name-based fallback
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+            local n = obj.Name:lower()
+            if n == "run" or n == "runbutton" or n == "fleebtn" or n:find("run") then
+                obj.MouseButton1Click:Fire()
+                return true, obj.Name
+            end
+        end
+    end
+    return false, nil
+end
+
+-- Detect battle screen: must have ALL four battle menu buttons visible
+-- Fight, Items, Loomians, Run — confirms it's the battle UI, not just any screen
+local function isBattleGui(gui)
+    if not gui:IsA("ScreenGui") then return false end
+    local hasRun, hasFight, hasLoomians = false, false, false
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if obj:IsA("TextButton") then
+            local t = obj.Text
+            if t == "Run"      then hasRun      = true end
+            if t == "Fight"    then hasFight    = true end
+            if t == "Loomians" then hasLoomians = true end
+        end
+    end
+    return hasRun and hasFight and hasLoomians
 end
 
 -- ── Notification Popup ───────────────────────────────────────────────────────
@@ -542,13 +561,6 @@ end
 -- (the battle menu) AND contains a pokemon name.
 
 local watchedGuis = {}  -- track GUIs we've already processed
-
-local function isBattleGui(gui)
-    if not gui:IsA("ScreenGui") and not gui:IsA("Frame") then return false end
-    local text = getAllText(gui)
-    -- Must have a run/flee option = it's a battle screen
-    return text:lower():find("run") or text:lower():find("flee") or text:lower():find("escape")
-end
 
 task.spawn(function()
     while true do
@@ -584,9 +596,9 @@ task.spawn(function()
                     task.wait(3)
 
                     if not isKeeper(getAllText(gui)) then  -- re-check in case UI updated
-                        local clicked = clickRunButton(gui)
+                        local clicked, btnName = clickRunButton(gui)
                         if clicked then
-                            addLog("✅ Run clicked!", Color3.fromRGB(80, 255, 80))
+                            addLog("✅ Clicked: \"" .. tostring(btnName) .. "\"", Color3.fromRGB(80, 255, 80))
                             encounterLabel.Text = "Last: Skipped ✓"
                         else
                             addLog("⚠ Couldn't find Run button — check Debug tab", Color3.fromRGB(255, 180, 80))
