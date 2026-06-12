@@ -1,33 +1,28 @@
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local collected = 0
 local isRunning = false
 
--- ── Ground Detection Settings ──────────────────────────────────────────────
--- Tweak these if eggs aren't being detected correctly.
--- Use the Debug tab to find what Y level your map's ground is.
-local GROUND_Y_THRESHOLD  = 15    -- eggs ABOVE this Y are considered "falling"
-local MAX_VELOCITY        = 3     -- eggs moving faster than this stud/s are "falling"
-local SCAN_RADIUS         = 120   -- how far (studs) to look for eggs
-local COLLECT_INTERVAL    = 0.4   -- seconds between each sweep
-local MAX_PER_SWEEP       = 8     -- max eggs to collect per sweep
--- ───────────────────────────────────────────────────────────────────────────
+-- ── Settings ────────────────────────────────────────────────────────────────
+local GROUND_Y_THRESHOLD = 15    -- eggs ABOVE this Y are "falling" (raise if your map is elevated)
+local MAX_VELOCITY       = 3     -- eggs faster than this stud/s are "falling"
+local SCAN_RADIUS        = 120   -- collection radius in studs
+local COLLECT_INTERVAL   = 0.4   -- seconds between sweeps
+local MAX_PER_SWEEP      = 8     -- max eggs per sweep
+-- ────────────────────────────────────────────────────────────────────────────
 
 -- Remove old UI
 local old = player.PlayerGui:FindFirstChild("EggCollectorUI")
 if old then old:Destroy() end
 
--- ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "EggCollectorUI"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = player.PlayerGui
 
--- Main Frame
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 260, 0, 260)
 frame.Position = UDim2.new(0.5, -130, 0, 20)
@@ -36,21 +31,15 @@ frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = frame
-
--- ── Title Bar ──────────────────────────────────────────
+-- Title Bar
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 35)
 titleBar.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
 titleBar.BorderSizePixel = 0
 titleBar.Parent = frame
-
-local titleBarCorner = Instance.new("UICorner")
-titleBarCorner.CornerRadius = UDim.new(0, 10)
-titleBarCorner.Parent = titleBar
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -40, 1, 0)
@@ -62,7 +51,6 @@ title.TextScaled = true
 title.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 title.Parent = titleBar
 
--- X Close Button
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 28, 0, 28)
 closeBtn.Position = UDim2.new(1, -32, 0, 4)
@@ -72,16 +60,10 @@ closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.TextScaled = true
 closeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 closeBtn.Parent = titleBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
-local closeBtnCorner = Instance.new("UICorner")
-closeBtnCorner.CornerRadius = UDim.new(0, 6)
-closeBtnCorner.Parent = closeBtn
-
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
--- ── Tab Buttons ─────────────────────────────────────────
+-- Tab Buttons
 local tabFrame = Instance.new("Frame")
 tabFrame.Size = UDim2.new(1, 0, 0, 28)
 tabFrame.Position = UDim2.new(0, 0, 0, 36)
@@ -98,16 +80,13 @@ local function makeTab(text, xPos)
     btn.TextScaled = true
     btn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
     btn.Parent = tabFrame
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 6)
-    c.Parent = btn
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     return btn
 end
-
 local tabMain  = makeTab("Collector", 0)
 local tabDebug = makeTab("Debug", 0.5)
 
--- ── Main Panel ──────────────────────────────────────────
+-- Main Panel
 local mainPanel = Instance.new("Frame")
 mainPanel.Size = UDim2.new(1, 0, 1, -68)
 mainPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -143,10 +122,7 @@ toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.TextScaled = true
 toggleBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 toggleBtn.Parent = mainPanel
-
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 8)
-btnCorner.Parent = toggleBtn
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
 toggleBtn.MouseButton1Click:Connect(function()
     isRunning = not isRunning
@@ -163,7 +139,7 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ── Debug Panel ─────────────────────────────────────────
+-- Debug Panel
 local debugPanel = Instance.new("Frame")
 debugPanel.Size = UDim2.new(1, 0, 1, -68)
 debugPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -180,10 +156,7 @@ scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanBtn.TextScaled = true
 scanBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 scanBtn.Parent = debugPanel
-
-local scanBtnCorner = Instance.new("UICorner")
-scanBtnCorner.CornerRadius = UDim.new(0, 6)
-scanBtnCorner.Parent = scanBtn
+Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
 
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Size = UDim2.new(1, -8, 0, 145)
@@ -193,23 +166,19 @@ scrollFrame.BorderSizePixel = 0
 scrollFrame.ScrollBarThickness = 4
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollFrame.Parent = debugPanel
-
-local scrollCorner = Instance.new("UICorner")
-scrollCorner.CornerRadius = UDim.new(0, 6)
-scrollCorner.Parent = scrollFrame
+Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 6)
 
 local logLayout = Instance.new("UIListLayout")
 logLayout.SortOrder = Enum.SortOrder.LayoutOrder
 logLayout.Padding = UDim.new(0, 2)
 logLayout.Parent = scrollFrame
 
-local logPadding = Instance.new("UIPadding")
-logPadding.PaddingLeft = UDim.new(0, 4)
-logPadding.PaddingTop = UDim.new(0, 4)
-logPadding.Parent = scrollFrame
+local logPad = Instance.new("UIPadding")
+logPad.PaddingLeft = UDim.new(0, 4)
+logPad.PaddingTop  = UDim.new(0, 4)
+logPad.Parent = scrollFrame
 
 local logEntries = {}
-
 local function addLog(text, color)
     color = color or Color3.fromRGB(180, 255, 180)
     local lbl = Instance.new("TextLabel")
@@ -231,73 +200,134 @@ local function addLog(text, color)
     scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.CanvasSize.Y.Offset)
 end
 
--- ── Ground Egg Detection ─────────────────────────────────────────────────────
+-- ── Core: resolve a MeshPart egg into (isGround, position, targetPart) ───────
 --[[
-    isGroundEgg(obj) → bool, position
-    Returns true (and the world position) only when ALL of these pass:
-      1. Name contains "egg" (case-insensitive)
-      2. It is a BasePart (MeshPart is a subclass – this catches MeshParts too)
-      3. Y position is below GROUND_Y_THRESHOLD  → not flying through the air
-      4. AssemblyLinearVelocity magnitude ≤ MAX_VELOCITY → not actively falling
-    Falling eggs spawn high up and move fast; ground eggs sit still at ground level.
-    Adjust GROUND_Y_THRESHOLD at the top of the script if your map's terrain is hilly.
+    HOW THIS WORKS:
+    The visible egg is almost always a MeshPart named "Egg" (or similar).
+    The actual COLLECTIBLE is whatever the server's touch/proximity script
+    listens on — typically one of:
+
+      A) The MeshPart itself    → touch teleport directly onto it
+      B) A sibling Part named   → "Hitbox", "Touch", "Collect", "Body" etc.
+         inside the same Model
+      C) The parent Model       → touching any part of the model counts
+
+    We find the MeshPart by name, then climb UP to its parent Model and look
+    for a sibling BasePart that looks like a hitbox, falling back to the
+    MeshPart itself.  We ALWAYS read Y/velocity from the MeshPart (visual egg)
+    because that's the part that falls.
 --]]
-local function isGroundEgg(obj)
-    -- Must be a BasePart (covers Part, MeshPart, UnionOperation, etc.)
-    if not obj:IsA("BasePart") then return false, nil end
+local HITBOX_NAMES = { "hitbox", "touch", "collect", "trigger", "body", "base", "root" }
 
-    -- Name must contain "egg"
-    if not obj.Name:lower():find("egg") then return false, nil end
+local function resolveEgg(obj)
+    -- Only interested in BaseParts named "egg" (covers MeshPart too)
+    if not obj:IsA("BasePart") then return false, nil, nil end
+    if not obj.Name:lower():find("egg") then return false, nil, nil end
 
-    local pos = obj.Position
-
-    -- Y-height check: ground eggs rest near terrain level
-    if pos.Y > GROUND_Y_THRESHOLD then return false, nil end
-
-    -- Velocity check: falling eggs move fast downward
+    local pos   = obj.Position
     local speed = obj.AssemblyLinearVelocity.Magnitude
-    if speed > MAX_VELOCITY then return false, nil end
 
-    return true, pos
+    -- Ground checks on the visual egg part
+    if pos.Y > GROUND_Y_THRESHOLD then return false, nil, nil end
+    if speed > MAX_VELOCITY        then return false, nil, nil end
+
+    -- ── Find the best part to teleport onto ──────────────────────────────
+    -- Priority 1: sibling hitbox inside the same Model
+    local targetPart = nil
+    local parentModel = obj.Parent
+    if parentModel and parentModel:IsA("Model") then
+        for _, sib in ipairs(parentModel:GetChildren()) do
+            if sib:IsA("BasePart") and sib ~= obj then
+                local sibLow = sib.Name:lower()
+                for _, hname in ipairs(HITBOX_NAMES) do
+                    if sibLow:find(hname) then
+                        targetPart = sib
+                        break
+                    end
+                end
+            end
+            if targetPart then break end
+        end
+
+        -- Priority 2: any other BasePart sibling (catch-all for unnamed hitboxes)
+        if not targetPart then
+            for _, sib in ipairs(parentModel:GetChildren()) do
+                if sib:IsA("BasePart") and sib ~= obj then
+                    targetPart = sib
+                    break
+                end
+            end
+        end
+    end
+
+    -- Priority 3: fall back to the MeshPart itself
+    if not targetPart then
+        targetPart = obj
+    end
+
+    return true, targetPart.Position, targetPart
 end
 
--- ── Scan Button Logic ────────────────────────────────────────────────────────
+-- ── Scan Button ──────────────────────────────────────────────────────────────
 scanBtn.MouseButton1Click:Connect(function()
     local char = player.Character
-    if not char then addLog("No character found!", Color3.fromRGB(255,80,80)) return end
+    if not char then addLog("No character!", Color3.fromRGB(255,80,80)) return end
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then addLog("No HumanoidRootPart!", Color3.fromRGB(255,80,80)) return end
 
-    addLog(string.format("── Scan (r=%d, maxY=%d, maxV=%d) ──",
-        SCAN_RADIUS, GROUND_Y_THRESHOLD, MAX_VELOCITY),
-        Color3.fromRGB(255, 220, 80))
+    addLog(string.format("── Scan r=%d maxY=%d maxV=%d ──",
+        SCAN_RADIUS, GROUND_Y_THRESHOLD, MAX_VELOCITY), Color3.fromRGB(255,220,80))
 
-    local groundCount, fallingCount = 0, 0
+    local gCount, fCount = 0, 0
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Name:lower():find("egg") then
-            local pos = obj.Position
-            local dist = (root.Position - pos).Magnitude
+            local dist = (root.Position - obj.Position).Magnitude
             if dist <= SCAN_RADIUS then
-                local speed   = obj.AssemblyLinearVelocity.Magnitude
-                local isHigh  = pos.Y > GROUND_Y_THRESHOLD
-                local isFast  = speed > MAX_VELOCITY
-                local ground  = not isHigh and not isFast
+                local speed  = obj.AssemblyLinearVelocity.Magnitude
+                local isHigh = obj.Position.Y > GROUND_Y_THRESHOLD
+                local isFast = speed > MAX_VELOCITY
 
-                if ground then
-                    groundCount += 1
+                -- Parent info
+                local parentName  = obj.Parent and obj.Parent.Name or "nil"
+                local parentClass = obj.Parent and obj.Parent.ClassName or "nil"
+
+                -- Sibling count (potential hitboxes)
+                local sibCount = 0
+                if obj.Parent and obj.Parent:IsA("Model") then
+                    for _, s in ipairs(obj.Parent:GetChildren()) do
+                        if s:IsA("BasePart") and s ~= obj then sibCount += 1 end
+                    end
+                end
+
+                if not isHigh and not isFast then
+                    gCount += 1
                     addLog(
-                        string.format("[GROUND✅] %s (%s) Y=%.1f V=%.1f dist=%d",
-                            obj.Name, obj.ClassName, pos.Y, speed, math.floor(dist)),
+                        string.format("[GROUND✅] %s | Y=%.1f V=%.1f d=%d | ^%s(%s) sibs=%d",
+                            obj.Name, obj.Position.Y, speed, math.floor(dist),
+                            parentName, parentClass, sibCount),
                         Color3.fromRGB(80, 255, 80)
                     )
+                    -- Show siblings so we know what the hitbox is called
+                    if obj.Parent and obj.Parent:IsA("Model") then
+                        for _, sib in ipairs(obj.Parent:GetChildren()) do
+                            if sib:IsA("BasePart") and sib ~= obj then
+                                addLog(
+                                    string.format("  sib: %s (%s) canCollide=%s",
+                                        sib.Name, sib.ClassName, tostring(sib.CanCollide)),
+                                    Color3.fromRGB(180, 255, 180)
+                                )
+                            end
+                        end
+                    end
                 else
-                    fallingCount += 1
-                    local reason = isHigh and ("highY=%.1f"):format(pos.Y)
-                                           or ("fastV=%.1f"):format(speed)
+                    fCount += 1
+                    local reason = isHigh
+                        and string.format("highY=%.1f", obj.Position.Y)
+                        or  string.format("fastV=%.1f", speed)
                     addLog(
-                        string.format("[SKIP ❌] %s (%s) %s dist=%d",
-                            obj.Name, obj.ClassName, reason, math.floor(dist)),
+                        string.format("[SKIP ❌] %s | %s | d=%d | ^%s",
+                            obj.Name, reason, math.floor(dist), parentName),
                         Color3.fromRGB(255, 100, 100)
                     )
                 end
@@ -305,14 +335,13 @@ scanBtn.MouseButton1Click:Connect(function()
         end
     end
 
-    addLog(string.format("Done. Ground=%d  Falling/skip=%d", groundCount, fallingCount),
-        Color3.fromRGB(255, 220, 80))
-    addLog(string.format("Thresholds: Y<%d  Speed<%d  (edit top of script)",
-        GROUND_Y_THRESHOLD, MAX_VELOCITY),
-        Color3.fromRGB(120, 120, 120))
+    addLog(string.format("Done. Ground=%d  Skipped=%d", gCount, fCount), Color3.fromRGB(255,220,80))
+    if gCount == 0 then
+        addLog("⚠ No ground eggs! Try raising GROUND_Y_THRESHOLD.", Color3.fromRGB(255,180,60))
+    end
 end)
 
--- ── Tab Switching ────────────────────────────────────────
+-- ── Tab Switching ────────────────────────────────────────────────────────────
 local function setTab(isDebug)
     mainPanel.Visible  = not isDebug
     debugPanel.Visible = isDebug
@@ -328,15 +357,13 @@ local function setTab(isDebug)
         tabDebug.TextColor3 = Color3.fromRGB(180, 180, 180)
     end
 end
-
 setTab(false)
 tabMain.MouseButton1Click:Connect(function() setTab(false) end)
 tabDebug.MouseButton1Click:Connect(function() setTab(true) end)
 
--- ── Main Collection Loop ─────────────────────────────────────────────────────
+-- ── Collection Loop ──────────────────────────────────────────────────────────
 local function collectEggs()
     if not isRunning then return end
-
     local char = player.Character
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -349,14 +376,27 @@ local function collectEggs()
         if not isRunning then break end
         if eggsFound >= MAX_PER_SWEEP then break end
 
-        local ok, targetPos = isGroundEgg(obj)
+        local ok, targetPos, targetPart = resolveEgg(obj)
 
         if ok and targetPos then
             local dist = (root.Position - targetPos).Magnitude
             if dist < SCAN_RADIUS then
                 eggsFound += 1
-                root.CFrame = CFrame.new(targetPos + Vector3.new(0, 4, 0))
-                task.wait(0.15)
+
+                -- Teleport onto the target part (hitbox or egg itself)
+                root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                task.wait(0.12)
+
+                -- If the parent is a Model with a PrimaryPart, also try touching that
+                if targetPart and targetPart.Parent and targetPart.Parent:IsA("Model") then
+                    local model = targetPart.Parent
+                    if model.PrimaryPart then
+                        root.CFrame = CFrame.new(
+                            model.PrimaryPart.Position + Vector3.new(0, 3, 0))
+                        task.wait(0.08)
+                    end
+                end
+
                 root.CFrame = originalCFrame
                 task.wait(0.08)
                 collected += 1
