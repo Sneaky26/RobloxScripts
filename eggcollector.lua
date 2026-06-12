@@ -1,5 +1,5 @@
--- Kyeggo Ground Collector + Rare Detector (Teleport Version)
--- Uses your original working teleport method
+-- Kyeggo Ground Collector (Fixed Teleport 2026)
+-- Only ground eggs + Rare notifications
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -13,7 +13,7 @@ local isRunning = false
 local old = player.PlayerGui:FindFirstChild("EggCollectorUI")
 if old then old:Destroy() end
 
--- ScreenGui
+-- UI Setup (same clean design)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "EggCollectorUI"
 screenGui.ResetOnSpawn = false
@@ -21,8 +21,8 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = player.PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 270, 0, 220)
-frame.Position = UDim2.new(0.5, -135, 0, 20)
+frame.Size = UDim2.new(0, 280, 0, 230)
+frame.Position = UDim2.new(0.5, -140, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 frame.Active = true
 frame.Draggable = true
@@ -70,7 +70,7 @@ statusLabel.Parent = frame
 
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-toggleBtn.Position = UDim2.new(0.1, 0, 0, 130)
+toggleBtn.Position = UDim2.new(0.1, 0, 0, 135)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 toggleBtn.Text = "START"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -96,10 +96,10 @@ end
 
 local function showRareNotification(egg, isSuper)
     local notif = Instance.new("TextLabel")
-    notif.Size = UDim2.new(0, 340, 0, 100)
-    notif.Position = UDim2.new(0.5, -170, 0.2, 0)
+    notif.Size = UDim2.new(0, 360, 0, 110)
+    notif.Position = UDim2.new(0.5, -180, 0.2, 0)
     notif.BackgroundColor3 = isSuper and Color3.fromRGB(255, 0, 100) or Color3.fromRGB(180, 0, 0)
-    notif.Text = (isSuper and "🔥 SUPER RARE EGG! (Gamma/Alpha Chance) 🔥" or "🎉 RARE KYEGGO EGG! 🎉") .. "\n" .. (egg.Name or "Special")
+    notif.Text = (isSuper and "🔥 SUPER RARE EGG!\n(Gamma/Alpha Chance) 🔥" or "🎉 RARE KYEGGO EGG! 🎉") .. "\n" .. (egg.Name or "Special Egg")
     notif.TextColor3 = Color3.fromRGB(255, 255, 100)
     notif.TextScaled = true
     notif.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -107,7 +107,7 @@ local function showRareNotification(egg, isSuper)
     
     local sound = Instance.new("Sound")
     sound.SoundId = isSuper and "rbxassetid://1848354536" or "rbxassetid://131057809"
-    sound.Volume = 0.85
+    sound.Volume = 0.9
     sound.Parent = workspace
     sound:Play()
     
@@ -145,29 +145,28 @@ local function collectItems()
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning then break end
-        if itemsFound >= 8 then break end
+        if itemsFound >= 6 then break end   -- Lower limit for stability
 
         if (obj.Name == "Egg" or obj.Name == "Easter Egg") and obj:IsA("MeshPart") then
             local pos = obj.Position
             local dist = (root.Position - pos).Magnitude
             
-            -- Only ground eggs
-            if dist < 130 and pos.Y < 60 then
+            -- Ground eggs only (you can change 55 if needed)
+            if dist < 140 and pos.Y < 55 then
                 itemsFound += 1
                 
-                -- Original teleport method you liked
-                root.CFrame = CFrame.new(pos + Vector3.new(0, 4, 0))
-                task.wait(0.2)
+                -- Teleport to egg
+                root.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+                task.wait(0.25)   -- Increased wait
                 root.CFrame = originalCFrame
-                task.wait(0.1)
+                task.wait(0.15)
 
                 if obj.Name == "Egg" then
                     collectedEggs += 1
                     eggLabel.Text = "Eggs Collected: " .. collectedEggs
                     
                     if isRareEgg(obj) then
-                        local isSuper = isSuperRareEgg(obj)
-                        showRareNotification(obj, isSuper)
+                        showRareNotification(obj, isSuperRareEgg(obj))
                     end
                 else
                     collectedCurrency += 1
@@ -182,8 +181,8 @@ end
 task.spawn(function()
     while true do
         pcall(collectItems)
-        task.wait(0.45)
+        task.wait(0.5)   -- Slightly slower loop
     end
 end)
 
-print("✅ Kyeggo Collector (Teleport Version) Loaded!")
+print("✅ Fixed Teleport Kyeggo Collector Loaded!")
