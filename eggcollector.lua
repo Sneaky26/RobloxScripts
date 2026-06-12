@@ -608,15 +608,15 @@ end)
 -- ── Auto-Run System ───────────────────────────────────────────────────────────
 -- ══════════════════════════════════════════════════════════════════════════════
 
-local function isKeeper(text)
+local function shouldAutoRun(text)
     for name, _ in pairs(COMMON_KYEGGOS) do
         if text:find(name, 1, true) then
-            return false, name
+            return true, name   -- Found in list → auto run
         end
     end
     if text:lower():find("kyeggo") then
-        local found = text:match("Kyeggo%S*") or text:match("kyeggo%S*") or "Kyeggo variant"
-        return true, found
+        local found = text:match("Kyeggo%S*") or text:match("kyeggo%S*") or "Unknown"
+        return false, found  -- Not in COMMON_KYEGGOS → Keeper
     end
     return false, nil
 end
@@ -633,16 +633,13 @@ local function getAllText(gui)
     return table.concat(texts, " ")
 end
 
--- ── FIXED: Click Run button by finding par=Run in the battle GUI ──────────────
+-- Click Run button (unchanged)
 local function clickRunButton(battleGui)
     local vu = game:GetService("VirtualUser")
-
-    -- First pass: find button whose parent is named "Run"
     if battleGui then
         for _, obj in ipairs(battleGui:GetDescendants()) do
             if (obj:IsA("TextButton") or obj:IsA("ImageButton"))
-                and obj.Parent
-                and obj.Parent.Name == "Run"
+                and obj.Parent and obj.Parent.Name == "Run"
                 and obj.Visible then
                 local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
                 pcall(function()
@@ -655,14 +652,13 @@ local function clickRunButton(battleGui)
         end
     end
 
-    -- Fallback: search all GUIs for a button parented under "Run"
+    -- Fallback
     for _, gui in ipairs(player.PlayerGui:GetChildren()) do
         if gui.Name == "EggCollectorUI" then continue end
         if not gui:IsA("ScreenGui") then continue end
         for _, obj in ipairs(gui:GetDescendants()) do
             if (obj:IsA("TextButton") or obj:IsA("ImageButton"))
-                and obj.Parent
-                and obj.Parent.Name == "Run"
+                and obj.Parent and obj.Parent.Name == "Run"
                 and obj.Visible then
                 local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
                 pcall(function()
@@ -675,7 +671,7 @@ local function clickRunButton(battleGui)
         end
     end
 
-    -- Last resort: screen-coordinate click at bottom-center
+    -- Last resort click
     local vp = Camera.ViewportSize
     pcall(function()
         vu:Button1Down(Vector2.new(vp.X / 2, vp.Y * 0.90), CFrame.new())
@@ -690,8 +686,8 @@ local function isBattleGui(gui)
     local hasRun, hasFight, hasLoomians = false, false, false
     for _, obj in ipairs(gui:GetDescendants()) do
         if obj:IsA("TextButton") then
-            if obj.Text == "Run"      then hasRun      = true end
-            if obj.Text == "Fight"    then hasFight    = true end
+            if obj.Text == "Run" then hasRun = true end
+            if obj.Text == "Fight" then hasFight = true end
             if obj.Text == "Loomians" then hasLoomians = true end
         end
     end
@@ -721,7 +717,6 @@ local function showNotif(text, color)
 end
 
 local watchedGuis = {}
-
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -736,25 +731,25 @@ task.spawn(function()
             if isBattleGui(gui) then
                 watchedGuis[gui] = true
                 local fullText = getAllText(gui)
-                local keep, reason = isKeeper(fullText)
+                local shouldRun, reason = shouldAutoRun(fullText)
 
-                if keep then
-                    showNotif("⭐ KEEPER: " .. reason:upper() .. "! Stay!", Color3.fromRGB(255, 180, 0))
-                    encounterLabel.Text = "Last: KEEPER (" .. reason .. ")"
-                    encounterLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
-                else
-                    showNotif("🏃 Auto-running in 3s...", Color3.fromRGB(80, 80, 120))
-                    encounterLabel.Text = "Last: Skipped (running...)"
+                if shouldRun then
+                    -- In COMMON_KYEGGOS → Auto Run
+                    showNotif("🏃 Auto-running " .. reason:upper() .. " in 3s...", Color3.fromRGB(80, 80, 120))
+                    encounterLabel.Text = "Last: Skipped (" .. reason .. ")"
                     encounterLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-
+                    
                     task.wait(3)
-
-                    -- Re-check before clicking in case GUI changed
-                    if not isKeeper(getAllText(gui)) then
-                        clickRunButton(gui)  -- pass the battle GUI directly
+                    if not getAllText(gui):lower():find("keeper") then
+                        clickRunButton(gui)
                         encounterLabel.Text = "Last: Skipped ✓"
                         encounterLabel.TextColor3 = Color3.fromRGB(120, 200, 120)
                     end
+                else
+                    -- Not in list → Keeper
+                    showNotif("⭐ KEEPER: " .. reason:upper() .. "! Stay!", Color3.fromRGB(255, 180, 0))
+                    encounterLabel.Text = "Last: KEEPER (" .. reason .. ")"
+                    encounterLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
                 end
 
                 task.delay(10, function() watchedGuis[gui] = nil end)
@@ -762,5 +757,4 @@ task.spawn(function()
         end
     end
 end)
-
 print("✅ Kyeggo Egg Collector loaded — ESP + Auto-Run (fixed Run button) ready")
