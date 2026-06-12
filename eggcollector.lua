@@ -87,7 +87,7 @@ tabFrame.Parent = frame
 
 local function makeTab(text, xPos)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.5, -4, 1, 0)
+    btn.Size = UDim2.new(0.333, -3, 1, 0)
     btn.Position = UDim2.new(xPos, 2, 0, 0)
     btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
     btn.Text = text
@@ -99,7 +99,8 @@ local function makeTab(text, xPos)
     return btn
 end
 local tabMain = makeTab("Collector", 0)
-local tabEsp  = makeTab("ESP", 0.5)
+local tabEsp  = makeTab("ESP", 0.333)
+local tabScan = makeTab("Scan", 0.666)
 
 -- ── Main Panel ───────────────────────────────────────────────────────────────
 local mainPanel = Instance.new("Frame")
@@ -255,25 +256,146 @@ espCountLabel.TextScaled = true
 espCountLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 espCountLabel.Parent = espPanel
 
--- ── Tab Switching ─────────────────────────────────────────────────────────────
-local function setTab(isEsp)
-    mainPanel.Visible = not isEsp
-    espPanel.Visible  = isEsp
-    if isEsp then
-        tabEsp.BackgroundColor3  = Color3.fromRGB(60, 100, 180)
-        tabEsp.TextColor3        = Color3.fromRGB(255, 255, 255)
-        tabMain.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-        tabMain.TextColor3       = Color3.fromRGB(180, 180, 180)
-    else
-        tabMain.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
-        tabMain.TextColor3       = Color3.fromRGB(255, 255, 255)
-        tabEsp.BackgroundColor3  = Color3.fromRGB(40, 40, 55)
-        tabEsp.TextColor3        = Color3.fromRGB(180, 180, 180)
+-- ── Scan Panel ───────────────────────────────────────────────────────────────
+local scanPanel = Instance.new("Frame")
+scanPanel.Size = UDim2.new(1, 0, 1, -68)
+scanPanel.Position = UDim2.new(0, 0, 0, 68)
+scanPanel.BackgroundTransparency = 1
+scanPanel.Visible = false
+scanPanel.Parent = frame
+
+local scanBtn = Instance.new("TextButton")
+scanBtn.Size = UDim2.new(1, -10, 0, 28)
+scanBtn.Position = UDim2.new(0, 5, 0, 4)
+scanBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 200)
+scanBtn.Text = "Scan Active Battle GUIs"
+scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+scanBtn.TextScaled = true
+scanBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+scanBtn.Parent = scanPanel
+Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
+
+local scanScroll = Instance.new("ScrollingFrame")
+scanScroll.Size = UDim2.new(1, -8, 1, -40)
+scanScroll.Position = UDim2.new(0, 4, 0, 36)
+scanScroll.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
+scanScroll.BorderSizePixel = 0
+scanScroll.ScrollBarThickness = 4
+scanScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scanScroll.Parent = scanPanel
+Instance.new("UICorner", scanScroll).CornerRadius = UDim.new(0, 6)
+
+local scanLayout = Instance.new("UIListLayout")
+scanLayout.SortOrder = Enum.SortOrder.LayoutOrder
+scanLayout.Padding = UDim.new(0, 1)
+scanLayout.Parent = scanScroll
+
+local scanPad = Instance.new("UIPadding")
+scanPad.PaddingLeft = UDim.new(0, 4)
+scanPad.PaddingTop  = UDim.new(0, 3)
+scanPad.Parent = scanScroll
+
+local scanEntries = {}
+local function scanLog(text, color)
+    color = color or Color3.fromRGB(180, 200, 180)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -8, 0, 12)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = color
+    lbl.TextSize = 9
+    lbl.Font = Enum.Font.Code
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextWrapped = true
+    lbl.AutomaticSize = Enum.AutomaticSize.Y
+    lbl.Parent = scanScroll
+    table.insert(scanEntries, lbl)
+    if #scanEntries > 200 then
+        scanEntries[1]:Destroy()
+        table.remove(scanEntries, 1)
     end
+    scanScroll.CanvasSize = UDim2.new(0, 0, 0, scanLayout.AbsoluteContentSize.Y + 6)
+    scanScroll.CanvasPosition = Vector2.new(0, scanScroll.CanvasSize.Y.Offset)
 end
-setTab(false)
-tabMain.MouseButton1Click:Connect(function() setTab(false) end)
-tabEsp.MouseButton1Click:Connect(function()  setTab(true)  end)
+
+local function clearScanLog()
+    for _, e in ipairs(scanEntries) do e:Destroy() end
+    scanEntries = {}
+    scanScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+end
+
+scanBtn.MouseButton1Click:Connect(function()
+    clearScanLog()
+    scanLog("=== Scanning all ScreenGuis ===", Color3.fromRGB(255, 220, 80))
+
+    local guiCount = 0
+    for _, gui in ipairs(player.PlayerGui:GetChildren()) do
+        if gui.Name == "EggCollectorUI" then continue end
+        if not gui:IsA("ScreenGui") then continue end
+        guiCount += 1
+        scanLog("── GUI: " .. gui.Name .. " (enabled=" .. tostring(gui.Enabled) .. ")",
+            Color3.fromRGB(100, 180, 255))
+
+        for _, obj in ipairs(gui:GetDescendants()) do
+            local cls = obj.ClassName
+            local nm  = obj.Name
+            local extra = ""
+
+            -- TextButton: show text + any script children
+            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                local txt = obj:IsA("TextButton") and (' "' .. obj.Text .. '"') or ""
+                local scripts = {}
+                for _, c in ipairs(obj:GetChildren()) do
+                    if c:IsA("LocalScript") or c:IsA("Script") then
+                        table.insert(scripts, c.Name)
+                    end
+                end
+                extra = txt
+                if #scripts > 0 then extra = extra .. " SCR:[" .. table.concat(scripts,",") .. "]" end
+                scanLog("  BTN " .. nm .. extra, Color3.fromRGB(80, 255, 120))
+
+            -- RemoteEvent / RemoteFunction — this is the jackpot
+            elseif cls == "RemoteEvent" or cls == "RemoteFunction" or cls == "BindableEvent" or cls == "BindableFunction" then
+                scanLog("  *** " .. cls .. ": " .. nm .. " ***", Color3.fromRGB(255, 80, 80))
+
+            -- LocalScript — note its name
+            elseif obj:IsA("LocalScript") or obj:IsA("Script") then
+                scanLog("  SCR: " .. nm, Color3.fromRGB(255, 180, 80))
+
+            -- Frame/other containers — just note name/class briefly
+            elseif obj:IsA("Frame") or obj:IsA("ScrollingFrame") then
+                scanLog("  frm " .. nm .. " (" .. cls .. ")", Color3.fromRGB(140, 140, 160))
+            end
+        end
+    end
+
+    if guiCount == 0 then
+        scanLog("No ScreenGuis found! Open a battle first.", Color3.fromRGB(255, 100, 80))
+    else
+        scanLog("=== Done. " .. guiCount .. " GUIs scanned ===", Color3.fromRGB(255, 220, 80))
+    end
+end)
+
+-- ── Tab Switching ─────────────────────────────────────────────────────────────
+local function setTab(t)
+    mainPanel.Visible = (t == "main")
+    espPanel.Visible  = (t == "esp")
+    scanPanel.Visible = (t == "scan")
+    local active   = Color3.fromRGB(60, 100, 180)
+    local inactive = Color3.fromRGB(40, 40, 55)
+    local atxt = Color3.fromRGB(255,255,255)
+    local itxt = Color3.fromRGB(180,180,180)
+    tabMain.BackgroundColor3 = t=="main" and active or inactive
+    tabMain.TextColor3       = t=="main" and atxt   or itxt
+    tabEsp.BackgroundColor3  = t=="esp"  and active or inactive
+    tabEsp.TextColor3        = t=="esp"  and atxt   or itxt
+    tabScan.BackgroundColor3 = t=="scan" and active or inactive
+    tabScan.TextColor3       = t=="scan" and atxt   or itxt
+end
+setTab("main")
+tabMain.MouseButton1Click:Connect(function() setTab("main") end)
+tabEsp.MouseButton1Click:Connect(function()  setTab("esp")  end)
+tabScan.MouseButton1Click:Connect(function() setTab("scan") end)
 
 -- ── Minimize ──────────────────────────────────────────────────────────────────
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -284,12 +406,14 @@ minimizeBtn.MouseButton1Click:Connect(function()
         tabFrame.Visible  = false
         mainPanel.Visible = false
         espPanel.Visible  = false
+        scanPanel.Visible = false
     else
         frame.Size = UDim2.new(0, 280, 0, 310)
         minimizeBtn.Text = "–"
         tabFrame.Visible  = true
         mainPanel.Visible = true
         espPanel.Visible  = false
+        scanPanel.Visible = false
     end
 end)
 
