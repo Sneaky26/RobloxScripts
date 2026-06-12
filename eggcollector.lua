@@ -352,7 +352,8 @@ scanBtn.MouseButton1Click:Connect(function()
                 end
                 extra = txt
                 if #scripts > 0 then extra = extra .. " SCR:[" .. table.concat(scripts,",") .. "]" end
-                scanLog("  BTN " .. nm .. extra, Color3.fromRGB(80, 255, 120))
+                local parentName = obj.Parent and obj.Parent.Name or "nil"
+                scanLog("  BTN " .. nm .. " ^" .. parentName .. extra, Color3.fromRGB(80, 255, 120))
 
             -- RemoteEvent / RemoteFunction — this is the jackpot
             elseif cls == "RemoteEvent" or cls == "RemoteFunction" or cls == "BindableEvent" or cls == "BindableFunction" then
