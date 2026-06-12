@@ -1,6 +1,3 @@
--- Kyeggo Event Auto Egg Collector (Improved 2026)
--- Works with Delta Executor on Android
-
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -8,6 +5,16 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local collected = 0
 local isRunning = false
+
+-- ── Ground Detection Settings ──────────────────────────────────────────────
+-- Tweak these if eggs aren't being detected correctly.
+-- Use the Debug tab to find what Y level your map's ground is.
+local GROUND_Y_THRESHOLD  = 15    -- eggs ABOVE this Y are considered "falling"
+local MAX_VELOCITY        = 3     -- eggs moving faster than this stud/s are "falling"
+local SCAN_RADIUS         = 120   -- how far (studs) to look for eggs
+local COLLECT_INTERVAL    = 0.4   -- seconds between each sweep
+local MAX_PER_SWEEP       = 8     -- max eggs to collect per sweep
+-- ───────────────────────────────────────────────────────────────────────────
 
 -- Remove old UI
 local old = player.PlayerGui:FindFirstChild("EggCollectorUI")
@@ -164,12 +171,11 @@ debugPanel.BackgroundTransparency = 1
 debugPanel.Visible = false
 debugPanel.Parent = frame
 
--- Scan button
 local scanBtn = Instance.new("TextButton")
 scanBtn.Size = UDim2.new(0.9, 0, 0, 28)
 scanBtn.Position = UDim2.new(0.05, 0, 0, 6)
 scanBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
-scanBtn.Text = "Scan Nearby Objects"
+scanBtn.Text = "Scan Nearby Eggs"
 scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanBtn.TextScaled = true
 scanBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -179,7 +185,6 @@ local scanBtnCorner = Instance.new("UICorner")
 scanBtnCorner.CornerRadius = UDim.new(0, 6)
 scanBtnCorner.Parent = scanBtn
 
--- Scrolling log
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Size = UDim2.new(1, -8, 0, 145)
 scrollFrame.Position = UDim2.new(0, 4, 0, 40)
@@ -218,7 +223,6 @@ local function addLog(text, color)
     lbl.TextWrapped = true
     lbl.Parent = scrollFrame
     table.insert(logEntries, lbl)
-    -- Keep at most 40 entries
     if #logEntries > 40 then
         logEntries[1]:Destroy()
         table.remove(logEntries, 1)
@@ -227,96 +231,85 @@ local function addLog(text, color)
     scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.CanvasSize.Y.Offset)
 end
 
--- ── Scan Logic ──────────────────────────────────────────
+-- ── Ground Egg Detection ─────────────────────────────────────────────────────
 --[[
-    HOW TO FIND THE REAL EGG OBJECT:
-    The visual falling egg is usually a MeshPart/Part named "Egg" that is
-    purely decorative. The REAL collectable is typically one of:
-      • A Part/Model with a "Touched" connection (has a Script/LocalScript child)
-      • A Part inside a Model folder (e.g. Workspace.Eggs.EggModel)
-      • A part whose parent Model has a BoolValue / StringValue "EggType" inside
-      • A Part with a ClickDetector or ProximityPrompt child
-    The scan below prints Name, ClassName, Parent, and any notable children
-    so you can identify the correct object to teleport to.
+    isGroundEgg(obj) → bool, position
+    Returns true (and the world position) only when ALL of these pass:
+      1. Name contains "egg" (case-insensitive)
+      2. It is a BasePart (MeshPart is a subclass – this catches MeshParts too)
+      3. Y position is below GROUND_Y_THRESHOLD  → not flying through the air
+      4. AssemblyLinearVelocity magnitude ≤ MAX_VELOCITY → not actively falling
+    Falling eggs spawn high up and move fast; ground eggs sit still at ground level.
+    Adjust GROUND_Y_THRESHOLD at the top of the script if your map's terrain is hilly.
 --]]
+local function isGroundEgg(obj)
+    -- Must be a BasePart (covers Part, MeshPart, UnionOperation, etc.)
+    if not obj:IsA("BasePart") then return false, nil end
 
+    -- Name must contain "egg"
+    if not obj.Name:lower():find("egg") then return false, nil end
+
+    local pos = obj.Position
+
+    -- Y-height check: ground eggs rest near terrain level
+    if pos.Y > GROUND_Y_THRESHOLD then return false, nil end
+
+    -- Velocity check: falling eggs move fast downward
+    local speed = obj.AssemblyLinearVelocity.Magnitude
+    if speed > MAX_VELOCITY then return false, nil end
+
+    return true, pos
+end
+
+-- ── Scan Button Logic ────────────────────────────────────────────────────────
 scanBtn.MouseButton1Click:Connect(function()
     local char = player.Character
     if not char then addLog("No character found!", Color3.fromRGB(255,80,80)) return end
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then addLog("No HumanoidRootPart!", Color3.fromRGB(255,80,80)) return end
 
-    addLog("── Scanning (150 stud range) ──", Color3.fromRGB(255, 220, 80))
+    addLog(string.format("── Scan (r=%d, maxY=%d, maxV=%d) ──",
+        SCAN_RADIUS, GROUND_Y_THRESHOLD, MAX_VELOCITY),
+        Color3.fromRGB(255, 220, 80))
 
-    local found = 0
+    local groundCount, fallingCount = 0, 0
+
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        -- Cast a wide net: any instance whose name contains "egg" (case-insensitive)
-        if obj.Name:lower():find("egg") then
-            local dist = 999
-            local pos = nil
+        if obj:IsA("BasePart") and obj.Name:lower():find("egg") then
+            local pos = obj.Position
+            local dist = (root.Position - pos).Magnitude
+            if dist <= SCAN_RADIUS then
+                local speed   = obj.AssemblyLinearVelocity.Magnitude
+                local isHigh  = pos.Y > GROUND_Y_THRESHOLD
+                local isFast  = speed > MAX_VELOCITY
+                local ground  = not isHigh and not isFast
 
-            -- Try to get a position for distance check
-            if obj:IsA("BasePart") then
-                pos = obj.Position
-            elseif obj:IsA("Model") and obj.PrimaryPart then
-                pos = obj.PrimaryPart.Position
-            elseif obj:IsA("Model") then
-                local p = obj:FindFirstChildWhichIsA("BasePart", true)
-                if p then pos = p.Position end
-            end
-
-            if pos then
-                dist = (root.Position - pos).Magnitude
-            end
-
-            if dist <= 150 then
-                found += 1
-                -- Color code by class type to help identify the real one
-                local clr = Color3.fromRGB(180, 255, 180)
-                if obj:IsA("Model") then
-                    clr = Color3.fromRGB(255, 220, 80)   -- yellow = Model (likely real)
-                elseif obj:IsA("MeshPart") then
-                    clr = Color3.fromRGB(180, 180, 255)  -- blue = MeshPart (likely visual)
+                if ground then
+                    groundCount += 1
+                    addLog(
+                        string.format("[GROUND✅] %s (%s) Y=%.1f V=%.1f dist=%d",
+                            obj.Name, obj.ClassName, pos.Y, speed, math.floor(dist)),
+                        Color3.fromRGB(80, 255, 80)
+                    )
+                else
+                    fallingCount += 1
+                    local reason = isHigh and ("highY=%.1f"):format(pos.Y)
+                                           or ("fastV=%.1f"):format(speed)
+                    addLog(
+                        string.format("[SKIP ❌] %s (%s) %s dist=%d",
+                            obj.Name, obj.ClassName, reason, math.floor(dist)),
+                        Color3.fromRGB(255, 100, 100)
+                    )
                 end
-
-                -- Check for collectability hints
-                local hints = {}
-                if obj:FindFirstChildWhichIsA("Script") or obj:FindFirstChildWhichIsA("LocalScript") then
-                    table.insert(hints, "HAS_SCRIPT")
-                end
-                if obj:FindFirstChildOfClass("ClickDetector") then
-                    table.insert(hints, "CLICK")
-                end
-                if obj:FindFirstChildOfClass("ProximityPrompt") then
-                    table.insert(hints, "PROMPT")
-                end
-                if obj:FindFirstChildOfClass("BoolValue") or obj:FindFirstChildOfClass("StringValue") or obj:FindFirstChildOfClass("IntValue") then
-                    table.insert(hints, "HAS_VALUE")
-                end
-                if obj:FindFirstChildOfClass("BillboardGui") then
-                    table.insert(hints, "BILLBOARD")
-                end
-
-                local hintStr = #hints > 0 and (" [" .. table.concat(hints, ",") .. "]") or ""
-                local parentName = obj.Parent and obj.Parent.Name or "nil"
-                local distStr = math.floor(dist) .. "st"
-
-                addLog(
-                    string.format("[%d] %s (%s) | ^%s | %s%s",
-                        found, obj.Name, obj.ClassName, parentName, distStr, hintStr),
-                    clr
-                )
             end
         end
     end
 
-    if found == 0 then
-        addLog("No egg objects found nearby.", Color3.fromRGB(255, 150, 80))
-    else
-        addLog(string.format("Done. %d object(s) found.", found), Color3.fromRGB(255, 220, 80))
-        addLog("Yellow=Model  Blue=MeshPart  Green=Other", Color3.fromRGB(120, 120, 120))
-        addLog("Look for HAS_SCRIPT or PROMPT tags -- those are likely the real collectable.", Color3.fromRGB(120, 255, 120))
-    end
+    addLog(string.format("Done. Ground=%d  Falling/skip=%d", groundCount, fallingCount),
+        Color3.fromRGB(255, 220, 80))
+    addLog(string.format("Thresholds: Y<%d  Speed<%d  (edit top of script)",
+        GROUND_Y_THRESHOLD, MAX_VELOCITY),
+        Color3.fromRGB(120, 120, 120))
 end)
 
 -- ── Tab Switching ────────────────────────────────────────
@@ -340,14 +333,7 @@ setTab(false)
 tabMain.MouseButton1Click:Connect(function() setTab(false) end)
 tabDebug.MouseButton1Click:Connect(function() setTab(true) end)
 
--- ── Main Collection Function ─────────────────────────────
---[[
-    UPDATE THIS after using the Debug tab:
-    Replace the name/class checks below with whatever the scan reveals.
-    E.g. if the real egg is a Model named "EggPickup", change the condition to:
-        obj:IsA("Model") and obj.Name == "EggPickup"
-    and teleport to obj.PrimaryPart.Position instead of obj.Position
---]]
+-- ── Main Collection Loop ─────────────────────────────────────────────────────
 local function collectEggs()
     if not isRunning then return end
 
@@ -361,32 +347,13 @@ local function collectEggs()
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning then break end
-        if eggsFound >= 8 then break end
+        if eggsFound >= MAX_PER_SWEEP then break end
 
-        local isEgg = false
-        local targetPos = nil
+        local ok, targetPos = isGroundEgg(obj)
 
-        -- ── EDIT THESE CONDITIONS based on Debug tab findings ──
-        if obj:IsA("Model") and obj.Name:lower():find("egg") then
-            -- Model type eggs (most likely the real collectable)
-            isEgg = true
-            if obj.PrimaryPart then
-                targetPos = obj.PrimaryPart.Position
-            else
-                local p = obj:FindFirstChildWhichIsA("BasePart", true)
-                if p then targetPos = p.Position end
-            end
-        elseif obj:IsA("BasePart") and obj.Name:lower():find("egg")
-               and not obj:IsA("MeshPart") then
-            -- Non-mesh BaseParts named egg (e.g. plain Parts used as hitboxes)
-            isEgg = true
-            targetPos = obj.Position
-        end
-        -- MeshParts are intentionally excluded (those are the visual-only falling ones)
-
-        if isEgg and targetPos then
+        if ok and targetPos then
             local dist = (root.Position - targetPos).Magnitude
-            if dist < 120 then
+            if dist < SCAN_RADIUS then
                 eggsFound += 1
                 root.CFrame = CFrame.new(targetPos + Vector3.new(0, 4, 0))
                 task.wait(0.15)
@@ -399,11 +366,10 @@ local function collectEggs()
     end
 end
 
--- Main Loop
 task.spawn(function()
     while true do
         pcall(collectEggs)
-        task.wait(0.4)
+        task.wait(COLLECT_INTERVAL)
     end
 end)
 
