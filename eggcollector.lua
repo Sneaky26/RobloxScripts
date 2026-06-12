@@ -113,21 +113,24 @@ local function collectEggs()
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
+    -- Save original position
+    local originalCFrame = root.CFrame
+
     for _, obj in Workspace:GetDescendants() do
         if not isRunning then break end
 
-        -- UPDATED: exact name match "Egg" and must be MeshPart
         if obj.Name == "Egg" and obj:IsA("MeshPart") then
             local dist = (root.Position - obj.Position).Magnitude
 
-            if dist < 60 then
-                pcall(function()
-                    firetouchinterest(root, obj, 0) -- touch
-                    task.wait(0.1)
-                    firetouchinterest(root, obj, 1) -- release
-                end)
+            if dist < 100 then
+                -- Teleport to egg
+                root.CFrame = CFrame.new(obj.Position + Vector3.new(0, 3, 0))
+                task.wait(0.2)
 
-                task.wait(0.15)
+                -- Return to original position
+                root.CFrame = originalCFrame
+                task.wait(0.1)
+
                 collected = collected + 1
                 counterLabel.Text = "Eggs Collected: " .. collected
             end
