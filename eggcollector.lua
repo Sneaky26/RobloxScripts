@@ -1,18 +1,15 @@
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local Camera = Workspace.CurrentCamera
 
 local player = Players.LocalPlayer
 local collected = 0
 local isRunning = false
 local isMinimized = false
-local espEnabled = false
-local autoRunEnabled = false
 
 -- ── Settings ─────────────────────────────────────────────────────────────────
-local COLLECT_INTERVAL = 0.4
-local MAX_PER_SWEEP    = 8
+local SCAN_RADIUS      = 120   -- studs (debug scan only, NOT used for collection)
+local COLLECT_INTERVAL = 0.4   -- seconds between sweeps
+local MAX_PER_SWEEP    = 8     -- max eggs per sweep
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Remove old UI
@@ -23,13 +20,10 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "EggCollectorUI"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.DisplayOrder = 999
 screenGui.Parent = player.PlayerGui
 
--- ── Main Frame ───────────────────────────────────────────────────────────────
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 310)
+frame.Size = UDim2.new(0, 280, 0, 300)
 frame.Position = UDim2.new(0.5, -140, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 frame.BorderSizePixel = 0
@@ -56,6 +50,7 @@ title.TextScaled = true
 title.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 title.Parent = titleBar
 
+-- Minimize Button
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 28, 0, 28)
 minimizeBtn.Position = UDim2.new(1, -64, 0, 4)
@@ -88,7 +83,7 @@ tabFrame.Parent = frame
 
 local function makeTab(text, xPos)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.333, -3, 1, 0)
+    btn.Size = UDim2.new(0.5, -4, 1, 0)
     btn.Position = UDim2.new(xPos, 2, 0, 0)
     btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
     btn.Text = text
@@ -99,9 +94,8 @@ local function makeTab(text, xPos)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     return btn
 end
-local tabMain = makeTab("Collector", 0)
-local tabEsp  = makeTab("ESP", 0.333)
-local tabScan = makeTab("Scan", 0.666)
+local tabMain  = makeTab("Collector", 0)
+local tabDebug = makeTab("Debug", 0.5)
 
 -- ── Main Panel ───────────────────────────────────────────────────────────────
 local mainPanel = Instance.new("Frame")
@@ -156,455 +150,212 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local autoRunToggle = Instance.new("TextButton")
-autoRunToggle.Size = UDim2.new(0.8, 0, 0, 30)
-autoRunToggle.Position = UDim2.new(0.1, 0, 0, 104)
-autoRunToggle.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-autoRunToggle.Text = "Auto-Run: OFF"
-autoRunToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoRunToggle.TextScaled = true
-autoRunToggle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-autoRunToggle.Parent = mainPanel
-Instance.new("UICorner", autoRunToggle).CornerRadius = UDim.new(0, 8)
+-- ── Debug Panel ──────────────────────────────────────────────────────────────
+local debugPanel = Instance.new("Frame")
+debugPanel.Size = UDim2.new(1, 0, 1, -68)
+debugPanel.Position = UDim2.new(0, 0, 0, 68)
+debugPanel.BackgroundTransparency = 1
+debugPanel.Visible = false
+debugPanel.Parent = frame
 
-autoRunToggle.MouseButton1Click:Connect(function()
-    autoRunEnabled = not autoRunEnabled
-    if autoRunEnabled then
-        autoRunToggle.Text = "Auto-Run: ON"
-        autoRunToggle.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
-    else
-        autoRunToggle.Text = "Auto-Run: OFF"
-        autoRunToggle.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-    end
-end)
+local radiusLabel = Instance.new("TextLabel")
+radiusLabel.Size = UDim2.new(1, -10, 0, 18)
+radiusLabel.Position = UDim2.new(0, 5, 0, 4)
+radiusLabel.BackgroundTransparency = 1
+radiusLabel.Text = "Stand next to a ground egg, then scan 20st"
+radiusLabel.TextColor3 = Color3.fromRGB(180, 200, 255)
+radiusLabel.TextSize = 10
+radiusLabel.Font = Enum.Font.Code
+radiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+radiusLabel.Parent = debugPanel
 
-local encounterLabel = Instance.new("TextLabel")
-encounterLabel.Size = UDim2.new(1, 0, 0, 18)
-encounterLabel.Position = UDim2.new(0, 0, 0, 140)
-encounterLabel.BackgroundTransparency = 1
-encounterLabel.Text = "Last Encounter: —"
-encounterLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
-encounterLabel.TextScaled = true
-encounterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
-encounterLabel.Parent = mainPanel
+local btnNear = Instance.new("TextButton")
+btnNear.Size = UDim2.new(0.44, 0, 0, 26)
+btnNear.Position = UDim2.new(0.03, 0, 0, 26)
+btnNear.BackgroundColor3 = Color3.fromRGB(60, 150, 80)
+btnNear.Text = "Scan 20st (close)"
+btnNear.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnNear.TextScaled = true
+btnNear.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+btnNear.Parent = debugPanel
+Instance.new("UICorner", btnNear).CornerRadius = UDim.new(0, 6)
 
--- ── ESP Panel ────────────────────────────────────────────────────────────────
-local espPanel = Instance.new("Frame")
-espPanel.Size = UDim2.new(1, 0, 1, -68)
-espPanel.Position = UDim2.new(0, 0, 0, 68)
-espPanel.BackgroundTransparency = 1
-espPanel.Visible = false
-espPanel.Parent = frame
+local btnFar = Instance.new("TextButton")
+btnFar.Size = UDim2.new(0.44, 0, 0, 26)
+btnFar.Position = UDim2.new(0.53, 0, 0, 26)
+btnFar.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
+btnFar.Text = "Scan 150st (wide)"
+btnFar.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnFar.TextScaled = true
+btnFar.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+btnFar.Parent = debugPanel
+Instance.new("UICorner", btnFar).CornerRadius = UDim.new(0, 6)
 
--- ESP toggle button
-local espToggleBtn = Instance.new("TextButton")
-espToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-espToggleBtn.Position = UDim2.new(0.1, 0, 0, 10)
-espToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-espToggleBtn.Text = "ESP: OFF"
-espToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-espToggleBtn.TextScaled = true
-espToggleBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-espToggleBtn.Parent = espPanel
-Instance.new("UICorner", espToggleBtn).CornerRadius = UDim.new(0, 8)
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -8, 0, 195)
+scrollFrame.Position = UDim2.new(0, 4, 0, 58)
+scrollFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+scrollFrame.BorderSizePixel = 0
+scrollFrame.ScrollBarThickness = 4
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.Parent = debugPanel
+Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 6)
 
--- Legend
-local function makeLegend(text, color, yPos)
-    local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0, 10, 0, 10)
-    dot.Position = UDim2.new(0, 12, 0, yPos + 4)
-    dot.BackgroundColor3 = color
-    dot.BorderSizePixel = 0
-    dot.Parent = espPanel
-    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+local logLayout = Instance.new("UIListLayout")
+logLayout.SortOrder = Enum.SortOrder.LayoutOrder
+logLayout.Padding = UDim.new(0, 2)
+logLayout.Parent = scrollFrame
 
+local logPad = Instance.new("UIPadding")
+logPad.PaddingLeft = UDim.new(0, 4)
+logPad.PaddingTop  = UDim.new(0, 4)
+logPad.Parent = scrollFrame
+
+local logEntries = {}
+local function addLog(text, color)
+    color = color or Color3.fromRGB(180, 255, 180)
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -30, 0, 18)
-    lbl.Position = UDim2.new(0, 28, 0, yPos)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(210, 210, 210)
-    lbl.TextSize = 11
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = espPanel
-end
-
-local espNormalPokemon = Color3.fromRGB(255, 120, 50)  -- orange     = normal pokemon
-local espRarePokemon   = Color3.fromRGB(255, 80, 255)  -- magenta    = rare variant (rainbow/gradient/alpha/gamma/wisp)
-
-local espInfoLabel = Instance.new("TextLabel")
-espInfoLabel.Size = UDim2.new(1, -10, 0, 16)
-espInfoLabel.Position = UDim2.new(0, 5, 0, 52)
-espInfoLabel.BackgroundTransparency = 1
-espInfoLabel.Text = "Labels all NPCs/Pokemon + currency eggs"
-espInfoLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
-espInfoLabel.TextSize = 10
-espInfoLabel.Font = Enum.Font.Code
-espInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-espInfoLabel.Parent = espPanel
-
-makeLegend("Normal Pokemon",                    espNormalPokemon, 72)
-makeLegend("Rare (Rainbow/Gradient/Alpha/etc.)", espRarePokemon,   94)
-
-local espCountLabel = Instance.new("TextLabel")
-espCountLabel.Size = UDim2.new(1, 0, 0, 18)
-espCountLabel.Position = UDim2.new(0, 0, 0, 120)
-espCountLabel.BackgroundTransparency = 1
-espCountLabel.Text = "Eggs: 0  |  NPCs: 0"
-espCountLabel.TextColor3 = Color3.fromRGB(0, 255, 180)
-espCountLabel.TextScaled = true
-espCountLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
-espCountLabel.Parent = espPanel
-
--- ── Scan Panel ───────────────────────────────────────────────────────────────
-local scanPanel = Instance.new("Frame")
-scanPanel.Size = UDim2.new(1, 0, 1, -68)
-scanPanel.Position = UDim2.new(0, 0, 0, 68)
-scanPanel.BackgroundTransparency = 1
-scanPanel.Visible = false
-scanPanel.Parent = frame
-
-local scanBtn = Instance.new("TextButton")
-scanBtn.Size = UDim2.new(1, -10, 0, 28)
-scanBtn.Position = UDim2.new(0, 5, 0, 4)
-scanBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 200)
-scanBtn.Text = "Scan Active Battle GUIs"
-scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-scanBtn.TextScaled = true
-scanBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-scanBtn.Parent = scanPanel
-Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
-
-local scanScroll = Instance.new("ScrollingFrame")
-scanScroll.Size = UDim2.new(1, -8, 1, -40)
-scanScroll.Position = UDim2.new(0, 4, 0, 36)
-scanScroll.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
-scanScroll.BorderSizePixel = 0
-scanScroll.ScrollBarThickness = 4
-scanScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-scanScroll.Parent = scanPanel
-Instance.new("UICorner", scanScroll).CornerRadius = UDim.new(0, 6)
-
-local scanLayout = Instance.new("UIListLayout")
-scanLayout.SortOrder = Enum.SortOrder.LayoutOrder
-scanLayout.Padding = UDim.new(0, 1)
-scanLayout.Parent = scanScroll
-
-local scanPad = Instance.new("UIPadding")
-scanPad.PaddingLeft = UDim.new(0, 4)
-scanPad.PaddingTop  = UDim.new(0, 3)
-scanPad.Parent = scanScroll
-
-local scanEntries = {}
-local function scanLog(text, color)
-    color = color or Color3.fromRGB(180, 200, 180)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -8, 0, 12)
+    lbl.Size = UDim2.new(1, -8, 0, 14)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = color
-    lbl.TextSize = 9
+    lbl.TextSize = 10
     lbl.Font = Enum.Font.Code
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.TextWrapped = true
     lbl.AutomaticSize = Enum.AutomaticSize.Y
-    lbl.Parent = scanScroll
-    table.insert(scanEntries, lbl)
-    if #scanEntries > 200 then
-        scanEntries[1]:Destroy()
-        table.remove(scanEntries, 1)
+    lbl.Parent = scrollFrame
+    table.insert(logEntries, lbl)
+    if #logEntries > 80 then
+        logEntries[1]:Destroy()
+        table.remove(logEntries, 1)
     end
-    scanScroll.CanvasSize = UDim2.new(0, 0, 0, scanLayout.AbsoluteContentSize.Y + 6)
-    scanScroll.CanvasPosition = Vector2.new(0, scanScroll.CanvasSize.Y.Offset)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, logLayout.AbsoluteContentSize.Y + 8)
+    scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.CanvasSize.Y.Offset)
 end
 
-local function clearScanLog()
-    for _, e in ipairs(scanEntries) do e:Destroy() end
-    scanEntries = {}
-    scanScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-end
+local function doScan(radius)
+    local char = player.Character
+    if not char then addLog("No character!", Color3.fromRGB(255,80,80)) return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then addLog("No HumanoidRootPart!", Color3.fromRGB(255,80,80)) return end
 
-scanBtn.MouseButton1Click:Connect(function()
-    clearScanLog()
-    scanLog("=== BATTLE GUI SCAN ===", Color3.fromRGB(255, 220, 80))
-
-    local guiCount = 0
-
-    -- GetDescendants on PlayerGui catches everything including folders/subguis
-    for _, gui in ipairs(player.PlayerGui:GetDescendants()) do
-        if not gui:IsA("ScreenGui") then continue end
-        if gui.Name == "EggCollectorUI" then continue end
-
-        guiCount += 1
-        scanLog("", Color3.fromRGB(255,255,255)) -- spacer
-        scanLog("GUI: " .. gui.Name .. " enabled=" .. tostring(gui.Enabled),
-            Color3.fromRGB(100, 200, 255))
-
-        -- Dump every single descendant with full path info — nothing filtered out
-        for _, obj in ipairs(gui:GetDescendants()) do
-            local cls = obj.ClassName
-            local nm  = obj.Name
-            local par  = obj.Parent and obj.Parent.Name or "?"
-            local gpar = (obj.Parent and obj.Parent.Parent) and obj.Parent.Parent.Name or "?"
-
-            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                -- Button: show name, text, parent, grandparent
-                local txt = obj:IsA("TextButton") and obj.Text or "(img)"
-                local pos = obj.AbsolutePosition
-                local sz  = obj.AbsoluteSize
-                scanLog("  BTN  name=" .. nm .. '  txt="' .. txt .. '"', Color3.fromRGB(80, 255, 120))
-                scanLog("       par=" .. par .. "  gpar=" .. gpar, Color3.fromRGB(60, 200, 100))
-                scanLog("       pos=(" .. math.floor(pos.X) .. "," .. math.floor(pos.Y) .. ")  size=(" .. math.floor(sz.X) .. "x" .. math.floor(sz.Y) .. ")  vis=" .. tostring(obj.Visible), Color3.fromRGB(60, 180, 80))
-
-            elseif cls == "RemoteEvent" or cls == "RemoteFunction"
-                or cls == "BindableEvent" or cls == "BindableFunction" then
-                -- Remotes are the key to firing Run without clicking
-                scanLog("  *** " .. cls .. " name=" .. nm .. " par=" .. par .. " ***",
-                    Color3.fromRGB(255, 60, 60))
-
-            elseif obj:IsA("LocalScript") or obj:IsA("Script") then
-                scanLog("  SCR  name=" .. nm .. "  par=" .. par,
-                    Color3.fromRGB(255, 180, 60))
+    local nearby = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local pos
+            if obj:IsA("BasePart") then
+                pos = obj.Position
+            elseif obj:IsA("Model") then
+                if obj.PrimaryPart then
+                    pos = obj.PrimaryPart.Position
+                else
+                    local p = obj:FindFirstChildWhichIsA("BasePart", true)
+                    if p then pos = p.Position end
+                end
+            end
+            if pos then
+                local dist = (root.Position - pos).Magnitude
+                if dist <= radius then
+                    table.insert(nearby, { obj = obj, dist = dist, pos = pos })
+                end
             end
         end
     end
 
-    scanLog("", Color3.fromRGB(255,255,255))
-    if guiCount == 0 then
-        scanLog("Nothing found — make sure you are IN a battle!", Color3.fromRGB(255, 80, 80))
-    else
-        scanLog("=== Done. " .. guiCount .. " ScreenGui(s) scanned ===", Color3.fromRGB(255, 220, 80))
+    table.sort(nearby, function(a, b) return a.dist < b.dist end)
+    addLog(string.format("── Scan r=%dst: %d objects ──", radius, #nearby), Color3.fromRGB(255,220,80))
+
+    for _, entry in ipairs(nearby) do
+        local obj  = entry.obj
+        local dist = entry.dist
+        local pos  = entry.pos
+        local parentName = obj.Parent and obj.Parent.Name or "nil"
+        local extra = ""
+        if obj:IsA("BasePart") then
+            local speed = obj.AssemblyLinearVelocity.Magnitude
+            local anch  = obj.Anchored and "A" or "U"
+            extra = string.format(" Y=%.1f V=%.1f %s", pos.Y, speed, anch)
+            local hints = {}
+            if obj:FindFirstChildOfClass("ClickDetector")   then table.insert(hints, "CLICK") end
+            if obj:FindFirstChildOfClass("ProximityPrompt") then table.insert(hints, "PROX")  end
+            if obj:FindFirstChildOfClass("TouchInterest")   then table.insert(hints, "TOUCH") end
+            if obj:FindFirstChildWhichIsA("Script") or obj:FindFirstChildWhichIsA("LocalScript") then
+                table.insert(hints, "SCR")
+            end
+            if #hints > 0 then extra = extra .. " [" .. table.concat(hints,",") .. "]" end
+        end
+
+        local clr = Color3.fromRGB(180, 180, 180)
+        if obj:IsA("MeshPart")  then clr = Color3.fromRGB(120, 160, 255) end
+        if obj:IsA("Model")     then clr = Color3.fromRGB(255, 220, 80)  end
+        if obj:IsA("Part")      then clr = Color3.fromRGB(180, 255, 180) end
+
+        if obj:IsA("MeshPart") and obj.Name:lower():find("egg")
+           and obj.Parent and obj.Parent.Name:lower():find("chunk") then
+            clr = Color3.fromRGB(0, 255, 220)
+            extra = extra .. " ← GROUND EGG ✅"
+        end
+
+        addLog(string.format("%.1fst | %s (%s) | ^%s%s",
+            dist, obj.Name, obj.ClassName, parentName, extra), clr)
     end
-end)
 
--- ── Tab Switching ─────────────────────────────────────────────────────────────
-local function setTab(t)
-    mainPanel.Visible = (t == "main")
-    espPanel.Visible  = (t == "esp")
-    scanPanel.Visible = (t == "scan")
-    local active   = Color3.fromRGB(60, 100, 180)
-    local inactive = Color3.fromRGB(40, 40, 55)
-    local atxt = Color3.fromRGB(255,255,255)
-    local itxt = Color3.fromRGB(180,180,180)
-    tabMain.BackgroundColor3 = t=="main" and active or inactive
-    tabMain.TextColor3       = t=="main" and atxt   or itxt
-    tabEsp.BackgroundColor3  = t=="esp"  and active or inactive
-    tabEsp.TextColor3        = t=="esp"  and atxt   or itxt
-    tabScan.BackgroundColor3 = t=="scan" and active or inactive
-    tabScan.TextColor3       = t=="scan" and atxt   or itxt
+    if #nearby == 0 then
+        addLog("Nothing found. Move closer!", Color3.fromRGB(255,150,80))
+    end
 end
-setTab("main")
-tabMain.MouseButton1Click:Connect(function() setTab("main") end)
-tabEsp.MouseButton1Click:Connect(function()  setTab("esp")  end)
-tabScan.MouseButton1Click:Connect(function() setTab("scan") end)
 
--- ── Minimize ──────────────────────────────────────────────────────────────────
+btnNear.MouseButton1Click:Connect(function() doScan(20)  end)
+btnFar.MouseButton1Click:Connect(function()  doScan(150) end)
+
+-- ── Tab Switching ────────────────────────────────────────────────────────────
+local function setTab(isDebug)
+    mainPanel.Visible  = not isDebug
+    debugPanel.Visible = isDebug
+    if isDebug then
+        tabDebug.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
+        tabDebug.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tabMain.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+        tabMain.TextColor3 = Color3.fromRGB(180, 180, 180)
+    else
+        tabMain.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
+        tabMain.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tabDebug.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+        tabDebug.TextColor3 = Color3.fromRGB(180, 180, 180)
+    end
+end
+setTab(false)
+tabMain.MouseButton1Click:Connect(function() setTab(false) end)
+tabDebug.MouseButton1Click:Connect(function() setTab(true) end)
+
+-- ── Minimize Logic ───────────────────────────────────────────────────────────
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
         frame.Size = UDim2.new(0, 280, 0, 35)
         minimizeBtn.Text = "□"
-        tabFrame.Visible  = false
+        tabFrame.Visible = false
         mainPanel.Visible = false
-        espPanel.Visible  = false
-        scanPanel.Visible = false
+        debugPanel.Visible = false
     else
-        frame.Size = UDim2.new(0, 280, 0, 310)
+        frame.Size = UDim2.new(0, 280, 0, 300)
         minimizeBtn.Text = "–"
-        tabFrame.Visible  = true
+        tabFrame.Visible = true
         mainPanel.Visible = true
-        espPanel.Visible  = false
-        scanPanel.Visible = false
+        debugPanel.Visible = false
     end
 end)
 
--- ══════════════════════════════════════════════════════════════════════════════
--- ── ESP System ───────────────────────────────────────────────────────────────
--- Uses BillboardGuis attached directly to parts so labels float above objects
--- in world-space. Much cleaner than screen-space projection.
--- ══════════════════════════════════════════════════════════════════════════════
-
-local espLabels = {}  -- [part] = BillboardGui
-
+-- ── Ground Egg Check ─────────────────────────────────────────────────────────
+--[[
+    Ground eggs confirmed:
+      - MeshPart named "Egg" (case-insensitive)
+      - Parent name contains "chunk" (chunk1, chunk2, chunk3, etc.)
+    Falling/visual eggs:
+      - Same MeshPart name but parent is "camera" or similar — SKIP those
+--]]
 local function isGroundEgg(obj)
-    if not obj:IsA("MeshPart") then return false end
-    if not obj.Name:lower():find("egg") then return false end
-    if not obj.Parent then return false end
-    if not obj.Parent.Name:lower():find("chunk") then return false end
-    return true
-end
-
-local function makeESPLabel(part, text, color)
-    if espLabels[part] then return end  -- already has one
-
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "KyeggoESP"
-    bb.Size = UDim2.new(0, 200, 0, 28)
-    bb.StudsOffset = Vector3.new(0, 3.5, 0)
-    bb.AlwaysOnTop = true
-    bb.MaxDistance = 300
-    bb.Adornee = part
-    bb.Parent = part  -- parent to part so it auto-removes when part does
-
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    bg.BackgroundTransparency = 0.35
-    bg.BorderSizePixel = 0
-    bg.Parent = bb
-    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 5)
-
-    -- Coloured left stripe
-    local stripe = Instance.new("Frame")
-    stripe.Size = UDim2.new(0, 4, 1, 0)
-    stripe.BackgroundColor3 = color
-    stripe.BorderSizePixel = 0
-    stripe.Parent = bg
-    Instance.new("UICorner", stripe).CornerRadius = UDim.new(0, 4)
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -8, 1, 0)
-    lbl.Position = UDim2.new(0, 7, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = color
-    lbl.TextSize = 11
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextTruncate = Enum.TextTruncate.AtEnd
-    lbl.Parent = bg
-
-    espLabels[part] = bb
-end
-
-local function removeESPLabel(part)
-    local bb = espLabels[part]
-    if bb then
-        bb:Destroy()
-        espLabels[part] = nil
-    end
-end
-
-local function clearAllESP()
-    for part, bb in pairs(espLabels) do
-        if bb and bb.Parent then bb:Destroy() end
-        espLabels[part] = nil
-    end
-end
-
-espToggleBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        espToggleBtn.Text = "ESP: ON"
-        espToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
-    else
-        espToggleBtn.Text = "ESP: OFF"
-        espToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        clearAllESP()
-        espCountLabel.Text = "Eggs visible: 0"
-    end
-end)
-
--- ── NPC / Pokemon color ─────────────────────────────────────────────────────
--- Exact model names that are NOT rare — auto-run on these
-local COMMON_KYEGGOS = {
-    ["Kyeggo-rviolet"]  = true,
-    ["Kyeggo-rorange"]  = true,
-    ["Kyeggo-rred"]     = true,
-    ["Kyeggo-blue"]     = true,
-    ["Kyeggo-green"]    = true,
-    ["Kyeggo-pattern4"] = true,
-    ["Kyeggo-pattern3"] = true,
-    ["Kyeggo-pattern2"] = true,
-    ["Kyeggo-pattern1"] = true,
-    ["Kyeggo-faberge1"] = true,
-    ["Kyeggo-faberge2"] = true,
-    ["Kyeggo-faberge3"] = true,
-    ["Kyeggo"]          = true,
-}
-
--- Any Kyeggo NOT in the common list = rare, notify user
-local function isRareKyeggo(name)
-    return not COMMON_KYEGGOS[name]
-end
-
--- Skip list — ignore these model names so ESP isn't cluttered with map junk
-local SKIP_NAMES = {
-    ["Baseplate"] = true, ["Terrain"] = true, ["Camera"] = true,
-    ["SpawnLocation"] = true, ["Sky"] = true, ["Lighting"] = true,
-    ["SunRaysEffect"] = true, ["Atmosphere"] = true,
-}
-
-local function isPlayerCharacter(model)
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character == model then return true end
-    end
-    return false
-end
-
--- Get the root part of a model to attach ESP to
-local function getModelRoot(model)
-    if model.PrimaryPart then return model.PrimaryPart end
-    local h = model:FindFirstChildWhichIsA("BasePart", true)
-    return h
-end
-
--- Get distance from local player to a position
-local function distTo(pos)
-    local char = player.Character
-    if not char then return 9999 end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return 9999 end
-    return (root.Position - pos).Magnitude
-end
-
--- Refresh ESP every 0.5s
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        if not espEnabled then continue end
-
-        local seenParts = {}
-        local npcCount  = 0
-
-        -- ── Kyeggo models only ────────────────────────────────────────────────
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if not obj:IsA("Model") then continue end
-            -- Only care about models starting with "Kyeggo" (case-insensitive)
-            if not obj.Name:lower():sub(1, 6) == "kyeggo" then continue end
-            if not obj.Name:lower():find("^kyeggo") then continue end
-            if isPlayerCharacter(obj) then continue end
-
-            local root = getModelRoot(obj)
-            if not root then continue end
-
-            seenParts[root] = true
-            npcCount += 1
-
-            if not espLabels[root] then
-                local rare = isRareKyeggo(obj.Name)
-                local prefix = rare and "⭐ " or "🔵 "
-                local color  = rare and espRarePokemon or espNormalPokemon
-                makeESPLabel(root, prefix .. obj.Name, color)
-            end
-        end
-
-        -- Remove stale labels
-        for part, _ in pairs(espLabels) do
-            if not seenParts[part] or not part.Parent then
-                removeESPLabel(part)
-            end
-        end
-
-        espCountLabel.Text = "Pokemon visible: " .. npcCount
-    end
-end)
-
--- ══════════════════════════════════════════════════════════════════════════════
--- ── Ground Egg Check (collection) ────────────────────────────────────────────
--- ══════════════════════════════════════════════════════════════════════════════
-local function isGroundEggPos(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
     if not obj.Parent then return false, nil end
@@ -612,7 +363,9 @@ local function isGroundEggPos(obj)
     return true, obj.Position
 end
 
--- ── Collection Loop ───────────────────────────────────────────────────────────
+-- ── Collection Loop ──────────────────────────────────────────────────────────
+-- Only change from original: removed the dist < SCAN_RADIUS check
+-- so it collects eggs anywhere on the map, not just within 120 studs
 local function collectEggs()
     if not isRunning then return end
     local char = player.Character
@@ -627,7 +380,7 @@ local function collectEggs()
         if not isRunning then break end
         if eggsFound >= MAX_PER_SWEEP then break end
 
-        local ok, targetPos = isGroundEggPos(obj)
+        local ok, targetPos = isGroundEgg(obj)
         if ok and targetPos then
             eggsFound += 1
             root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
@@ -647,40 +400,4 @@ task.spawn(function()
     end
 end)
 
--- ══════════════════════════════════════════════════════════════════════════════
--- ── Auto-Run Filter ───────────────────────────────────────────────────────────
--- ══════════════════════════════════════════════════════════════════════════════
--- isKeeper: scans GUI text for any Kyeggo name that is NOT in the common list
--- Returns true + the name if it's a rare Kyeggo worth keeping
-local function isKeeper(text)
-    -- Check for exact common names first — if found, it's NOT a keeper
-    for name, _ in pairs(COMMON_KYEGGOS) do
-        if text:find(name, 1, true) then
-            return false, name
-        end
-    end
-    -- If the battle screen mentions any Kyeggo at all but it's not in common list = rare
-    if text:lower():find("kyeggo") then
-        -- Extract the Kyeggo name from text for the notification
-        local found = text:match("Kyeggo%S*") or text:match("kyeggo%S*") or "Kyeggo variant"
-        return true, found
-    end
-    return false, nil
-end
-
-local function getAllText(gui)
-    local texts = {}
-    for _, obj in ipairs(gui:GetDescendants()) do
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            if obj.Text and obj.Text ~= "" then
-                table.insert(texts, obj.Text)
-            end
-        end
-    end
-    return table.concat(texts, " ")
-end
-
-local function clickRunButton()
-    -- Run button is always at bottom-center of screen (from screenshot)
-    -- Screen center-X, roughly 85% down the screen
-    local vu = game:GetService("VirtualUser")
+print("✅ Kyeggo Egg Collector loaded! Ground egg rule: MeshPart named 'Egg' parented to 'chunk*'")
