@@ -228,10 +228,8 @@ local function makeLegend(text, color, yPos)
     lbl.Parent = espPanel
 end
 
-local espEggColor      = Color3.fromRGB(0, 255, 180)   -- cyan-green = currency egg
 local espNormalPokemon = Color3.fromRGB(255, 120, 50)  -- orange     = normal pokemon
 local espRarePokemon   = Color3.fromRGB(255, 80, 255)  -- magenta    = rare variant (rainbow/gradient/alpha/gamma/wisp)
-local espPlayerColor   = Color3.fromRGB(255, 220, 50)  -- yellow     = other players
 
 local espInfoLabel = Instance.new("TextLabel")
 espInfoLabel.Size = UDim2.new(1, -10, 0, 16)
@@ -244,14 +242,12 @@ espInfoLabel.Font = Enum.Font.Code
 espInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 espInfoLabel.Parent = espPanel
 
-makeLegend("Currency Egg",                          espEggColor,      72)
-makeLegend("Normal Pokemon",                        espNormalPokemon, 94)
-makeLegend("Rare Pokemon (Rainbow/Alpha/etc.)",     espRarePokemon,   116)
-makeLegend("Other Players",                         espPlayerColor,   138)
+makeLegend("Normal Pokemon",                    espNormalPokemon, 72)
+makeLegend("Rare (Rainbow/Gradient/Alpha/etc.)", espRarePokemon,   94)
 
 local espCountLabel = Instance.new("TextLabel")
 espCountLabel.Size = UDim2.new(1, 0, 0, 18)
-espCountLabel.Position = UDim2.new(0, 0, 0, 162)
+espCountLabel.Position = UDim2.new(0, 0, 0, 120)
 espCountLabel.BackgroundTransparency = 1
 espCountLabel.Text = "Eggs: 0  |  NPCs: 0"
 espCountLabel.TextColor3 = Color3.fromRGB(0, 255, 180)
@@ -313,21 +309,12 @@ local function isGroundEgg(obj)
     return true
 end
 
-local function getEggLabel(obj)
-    -- Try to pull a descriptive name from the object or its parent model
-    local n = obj.Name
-    if obj.Parent and obj.Parent:IsA("Model") then
-        n = obj.Parent.Name .. "/" .. n
-    end
-    return n
-end
-
 local function makeESPLabel(part, text, color)
     if espLabels[part] then return end  -- already has one
 
     local bb = Instance.new("BillboardGui")
     bb.Name = "KyeggoESP"
-    bb.Size = UDim2.new(0, 120, 0, 28)
+    bb.Size = UDim2.new(0, 200, 0, 28)
     bb.StudsOffset = Vector3.new(0, 3.5, 0)
     bb.AlwaysOnTop = true
     bb.MaxDistance = 300
@@ -442,21 +429,7 @@ task.spawn(function()
         if not espEnabled then continue end
 
         local seenParts = {}
-        local eggCount  = 0
         local npcCount  = 0
-
-        -- ── Currency eggs ─────────────────────────────────────────────────────
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if isGroundEgg(obj) then
-                seenParts[obj] = true
-                eggCount += 1
-                local color = espEggColor  -- currency egg, always same color
-                local label = "🥚 " .. getEggLabel(obj)
-                if not espLabels[obj] then
-                    makeESPLabel(obj, label, color)
-                end
-            end
-        end
 
         -- ── Pokemon / NPC models ──────────────────────────────────────────────
         -- Any Model that has a Humanoid OR AnimationController inside it
@@ -491,20 +464,6 @@ task.spawn(function()
             end
         end
 
-        -- ── Other players ─────────────────────────────────────────────────────
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p == player then continue end
-            if p.Character then
-                local root = p.Character:FindFirstChild("HumanoidRootPart")
-                if root then
-                    seenParts[root] = true
-                    if not espLabels[root] then
-                        makeESPLabel(root, "👤 " .. p.Name, espPlayerColor)
-                    end
-                end
-            end
-        end
-
         -- Remove stale labels
         for part, _ in pairs(espLabels) do
             if not seenParts[part] or not part.Parent then
@@ -512,7 +471,7 @@ task.spawn(function()
             end
         end
 
-        espCountLabel.Text = "Eggs: " .. eggCount .. "  |  NPCs: " .. npcCount
+        espCountLabel.Text = "Pokemon visible: " .. npcCount
     end
 end)
 
