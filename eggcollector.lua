@@ -401,3 +401,206 @@ task.spawn(function()
 end)
 
 print("✅ Kyeggo Egg Collector loaded! Ground egg rule: MeshPart named 'Egg' parented to 'chunk*'")
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ── Auto-Run Filter ──────────────────────────────────────────────────────────
+-- Watches for the battle/encounter screen. If the pokemon that appeared is NOT
+-- a keeper (Rainbow, Gradient, Alpha, Gamma, Luminami) it waits 3s then clicks Run.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- ── Toggle & UI ──────────────────────────────────────────────────────────────
+local autoRunEnabled = false
+
+-- Add "Auto-Run" toggle to main panel (below the START/STOP button)
+local autoRunToggle = Instance.new("TextButton")
+autoRunToggle.Size = UDim2.new(0.8, 0, 0, 30)
+autoRunToggle.Position = UDim2.new(0.1, 0, 0, 104)
+autoRunToggle.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+autoRunToggle.Text = "Auto-Run: OFF"
+autoRunToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoRunToggle.TextScaled = true
+autoRunToggle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+autoRunToggle.Parent = mainPanel
+Instance.new("UICorner", autoRunToggle).CornerRadius = UDim.new(0, 8)
+
+autoRunToggle.MouseButton1Click:Connect(function()
+    autoRunEnabled = not autoRunEnabled
+    if autoRunEnabled then
+        autoRunToggle.Text = "Auto-Run: ON"
+        autoRunToggle.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+    else
+        autoRunToggle.Text = "Auto-Run: OFF"
+        autoRunToggle.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+-- Last encounter label
+local encounterLabel = Instance.new("TextLabel")
+encounterLabel.Size = UDim2.new(1, 0, 0, 18)
+encounterLabel.Position = UDim2.new(0, 0, 0, 140)
+encounterLabel.BackgroundTransparency = 1
+encounterLabel.Text = "Last Encounter: —"
+encounterLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+encounterLabel.TextScaled = true
+encounterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
+encounterLabel.Parent = mainPanel
+
+-- ── Keeper Detection ─────────────────────────────────────────────────────────
+-- Returns true if this encounter is worth keeping (don't auto-run)
+local KEEPER_KEYWORDS = {
+    "rainbow",   -- Rainbow variant
+    "gradient",  -- Gradient variant
+    "alpha",     -- Alpha
+    "gamma",     -- Gamma
+    "luminami",  -- Luminami (rare pokemon from image)
+    "wisp",      -- Wisp variant (mentioned in request)
+}
+
+local function isKeeper(text)
+    local lower = text:lower()
+    for _, kw in ipairs(KEEPER_KEYWORDS) do
+        if lower:find(kw) then
+            return true, kw
+        end
+    end
+    return false, nil
+end
+
+-- Recursively collect all text from a GUI object
+local function getAllText(gui)
+    local texts = {}
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            if obj.Text and obj.Text ~= "" then
+                table.insert(texts, obj.Text)
+            end
+        end
+    end
+    return table.concat(texts, " ")
+end
+
+-- Find and click the Run button inside a GUI
+local function clickRunButton(gui)
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if (obj:IsA("TextButton") or obj:IsA("ImageButton")) then
+            local name  = obj.Name:lower()
+            local txt   = obj:IsA("TextButton") and obj.Text:lower() or ""
+            if name:find("run") or txt:find("run")
+            or name:find("flee") or txt:find("flee")
+            or name:find("escape") or txt:find("escape") then
+                -- Fire the button
+                local click = obj:FindFirstChildOfClass("ClickDetector")
+                if click then
+                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(
+                        obj.AbsolutePosition.X + obj.AbsoluteSize.X/2,
+                        obj.AbsolutePosition.Y + obj.AbsoluteSize.Y/2,
+                        0, true, game, 0)
+                    task.wait(0.05)
+                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(
+                        obj.AbsolutePosition.X + obj.AbsoluteSize.X/2,
+                        obj.AbsolutePosition.Y + obj.AbsoluteSize.Y/2,
+                        0, false, game, 0)
+                else
+                    -- Fallback: fire MouseButton1Click directly
+                    obj.MouseButton1Click:Fire()
+                end
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- ── Notification Popup ───────────────────────────────────────────────────────
+local function showNotif(text, color)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 260, 0, 44)
+    notif.Position = UDim2.new(0.5, -130, 1, -60)
+    notif.BackgroundColor3 = color or Color3.fromRGB(30, 30, 45)
+    notif.BorderSizePixel = 0
+    notif.Parent = screenGui
+    Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 10)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -10, 1, 0)
+    lbl.Position = UDim2.new(0, 5, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.TextScaled = true
+    lbl.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+    lbl.Parent = notif
+
+    task.delay(3.5, function()
+        if notif and notif.Parent then notif:Destroy() end
+    end)
+end
+
+-- ── Battle Screen Watcher ────────────────────────────────────────────────────
+-- Scans PlayerGui every 0.3s for a new screen that looks like a battle UI.
+-- Heuristic: a new ScreenGui appears whose full text contains "run" or "flee"
+-- (the battle menu) AND contains a pokemon name.
+
+local watchedGuis = {}  -- track GUIs we've already processed
+
+local function isBattleGui(gui)
+    if not gui:IsA("ScreenGui") and not gui:IsA("Frame") then return false end
+    local text = getAllText(gui)
+    -- Must have a run/flee option = it's a battle screen
+    return text:lower():find("run") or text:lower():find("flee") or text:lower():find("escape")
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+        if not autoRunEnabled then continue end
+
+        for _, gui in ipairs(player.PlayerGui:GetChildren()) do
+            if gui.Name == "EggCollectorUI" then continue end
+            if watchedGuis[gui] then continue end
+            if not gui:IsA("ScreenGui") then continue end
+            if not gui.Enabled then continue end
+
+            -- Check if it looks like a battle screen
+            if isBattleGui(gui) then
+                watchedGuis[gui] = true
+
+                local fullText = getAllText(gui)
+                local keep, reason = isKeeper(fullText)
+
+                if keep then
+                    -- ✅ Keeper — notify and don't run
+                    showNotif("⭐ KEEPER: " .. reason:upper() .. "! Stay!", Color3.fromRGB(255, 180, 0))
+                    encounterLabel.Text = "Last: KEEPER (" .. reason .. ")"
+                    encounterLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+                    addLog("⭐ KEEPER encountered: " .. reason, Color3.fromRGB(255, 220, 80))
+                else
+                    -- 🏃 Not a keeper — show countdown then run
+                    showNotif("🏃 Auto-running in 3s... (not a keeper)", Color3.fromRGB(80, 80, 120))
+                    encounterLabel.Text = "Last: Skipped (running...)"
+                    encounterLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+                    addLog("🏃 Not a keeper — auto-running in 3s", Color3.fromRGB(180, 180, 200))
+
+                    task.wait(3)
+
+                    if not isKeeper(getAllText(gui)) then  -- re-check in case UI updated
+                        local clicked = clickRunButton(gui)
+                        if clicked then
+                            addLog("✅ Run clicked!", Color3.fromRGB(80, 255, 80))
+                            encounterLabel.Text = "Last: Skipped ✓"
+                        else
+                            addLog("⚠ Couldn't find Run button — check Debug tab", Color3.fromRGB(255, 180, 80))
+                            encounterLabel.Text = "Last: Run btn not found"
+                            showNotif("⚠ Run button not found! Check Debug.", Color3.fromRGB(200, 100, 0))
+                        end
+                    end
+                end
+
+                -- Clean up old tracked entries to avoid memory leak
+                task.delay(10, function() watchedGuis[gui] = nil end)
+            end
+        end
+    end
+end)
+
+print("✅ Auto-Run filter active. Keepers: Rainbow, Gradient, Alpha, Gamma, Wisp, Luminami")
