@@ -1,9 +1,10 @@
--- Kyeggo Event Auto Egg Collector (Improved 2026)
+-- Kyeggo Event Auto Egg Collector (Improved 2026 v2)
 -- Works with Delta Executor on Android
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local collected = 0
@@ -22,8 +23,8 @@ screenGui.Parent = player.PlayerGui
 
 -- Main Frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 240, 0, 180)
-frame.Position = UDim2.new(0.5, -120, 0, 20)
+frame.Size = UDim2.new(0, 260, 0, 220)
+frame.Position = UDim2.new(0.5, -130, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -38,7 +39,7 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 35)
 title.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-title.Text = "Kyeggo Egg Collector"
+title.Text = "Kyeggo Egg Collector v2"
 title.TextColor3 = Color3.fromRGB(255, 220, 80)
 title.TextScaled = true
 title.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
@@ -47,6 +48,25 @@ title.Parent = frame
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 10)
 titleCorner.Parent = title
+
+-- Close Button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextScaled = true
+closeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+closeBtn.Parent = frame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeBtn
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
 
 -- Counter
 local counterLabel = Instance.new("TextLabel")
@@ -85,6 +105,21 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 8)
 btnCorner.Parent = toggleBtn
 
+-- Debug Tab Button
+local debugBtn = Instance.new("TextButton")
+debugBtn.Size = UDim2.new(0.8, 0, 0, 30)
+debugBtn.Position = UDim2.new(0.1, 0, 0, 140)
+debugBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+debugBtn.Text = "Debug - Find Egg Names"
+debugBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+debugBtn.TextScaled = true
+debugBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
+debugBtn.Parent = frame
+
+local debugCorner = Instance.new("UICorner")
+debugCorner.CornerRadius = UDim.new(0, 8)
+debugCorner.Parent = debugBtn
+
 -- Toggle Logic
 toggleBtn.MouseButton1Click:Connect(function()
     isRunning = not isRunning
@@ -101,7 +136,37 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Main Collection Function
+-- ==================== DEBUG FUNCTION ====================
+local function debugEggs()
+    print("🔍 === KYEGGO EGG DEBUG START ===")
+    local char = player.Character
+    if not char then print("No character") return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then print("No HRP") return end
+
+    local found = 0
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("MeshPart") or obj:IsA("Part") then
+            local dist = (root.Position - obj.Position).Magnitude
+            if dist < 150 then
+                if obj.Name:lower():find("egg") or (obj.Parent and obj.Parent.Name:lower():find("egg")) then
+                    found += 1
+                    print(string.format("[%d] Name: %s | Class: %s | Parent: %s | Distance: %.1f", 
+                        found, obj.Name, obj.ClassName, obj.Parent.Name, dist))
+                    
+                    -- Print hierarchy
+                    local hierarchy = obj:GetFullName()
+                    print("   Full Path: " .. hierarchy)
+                end
+            end
+        end
+    end
+    print("🔍 === Found " .. found .. " potential egg objects ===\n")
+end
+
+debugBtn.MouseButton1Click:Connect(debugEggs)
+
+-- ==================== IMPROVED COLLECTION ====================
 local function collectEggs()
     if not isRunning then return end
     
@@ -115,21 +180,34 @@ local function collectEggs()
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning then break end
-        if eggsFound >= 8 then break end  -- Limit per cycle for performance
+        if eggsFound >= 6 then break end  -- Lowered for better performance
 
-        if obj.Name == "Egg" and obj:IsA("MeshPart") or 
-           (obj.Name:find("Egg") and obj:IsA("MeshPart")) then
-            
+        -- Better egg detection
+        local isEgg = false
+        if obj.Name == "Egg" or obj.Name:find("Egg") then
+            isEgg = true
+        elseif obj.Parent and (obj.Parent.Name == "Egg" or obj.Parent.Name:find("Egg")) then
+            isEgg = true
+        elseif obj:FindFirstAncestorWhichIsA("Model") then
+            local model = obj:FindFirstAncestorWhichIsA("Model")
+            if model.Name:lower():find("egg") then
+                isEgg = true
+            end
+        end
+
+        if isEgg and (obj:IsA("MeshPart") or obj:IsA("Part")) then
             local dist = (root.Position - obj.Position).Magnitude
-            if dist < 120 then  -- Adjustable range
+            if dist < 130 then
                 eggsFound += 1
                 
-                -- Teleport + small wait (safe method)
-                root.CFrame = CFrame.new(obj.Position + Vector3.new(0, 4, 0))
-                task.wait(0.15)
+                -- Teleport to the actual collectible part
+                local targetPos = obj.Position + Vector3.new(0, 3.5, 0)
                 
-                -- Return to original position
-                root.CFrame = originalCFrame
+                root.CFrame = CFrame.new(targetPos)
+                task.wait(0.12)
+                
+                -- Optional: small random offset to avoid detection
+                root.CFrame = CFrame.new(targetPos + Vector3.new(math.random(-2,2), 0, math.random(-2,2)))
                 task.wait(0.08)
                 
                 collected += 1
@@ -143,8 +221,8 @@ end
 task.spawn(function()
     while true do
         pcall(collectEggs)
-        task.wait(0.4)  -- Balanced speed
+        task.wait(0.35)
     end
 end)
 
-print("✅ Kyeggo Egg Collector Loaded!")
+print("✅ Kyeggo Egg Collector v2 Loaded! Use Debug button to find correct egg parts.")
