@@ -192,13 +192,13 @@ autoZoneBtn.Parent = mainPanel
 Instance.new("UICorner", autoZoneBtn).CornerRadius = UDim.new(0, 8)
 
 local eggRainZones = {
-    {name = "Route 3", pos = Vector3.new(0, 50, 0)},
-    {name = "Route 4", pos = Vector3.new(0, 50, 0)},
-    {name = "Route 6", pos = Vector3.new(0, 50, 0)},
-    {name = "Route 8", pos = Vector3.new(0, 50, 0)},
-    {name = "Cheshma Town", pos = Vector3.new(0, 50, 0)},
-    {name = "Silvent City", pos = Vector3.new(0, 50, 0)},
-    {name = "Heiwa Village", pos = Vector3.new(0, 50, 0)},
+    {name = "Cheshma Town", pos = Vector3.new(-220, 91, -564)},
+    {name = "Route 3", pos = Vector3.new(-1598, 111, -398)},
+    {name = "Silvent City", pos = Vector3.new(-1586, 168, -1110)},
+    {name = "Kanoko Village", pos = Vector3.new(-1027, 82, -1418)},
+    {name = "Rally Ranch", pos = Vector3.new(524, 64, -168)},
+    {name = "Route 8", pos = Vector3.new(211, 341, 3448)},
+    {name = "Living District", pos = Vector3.new(-3027, 501, -704)},
 }
 
 local currentZoneIndex = 1
