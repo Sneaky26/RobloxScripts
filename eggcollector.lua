@@ -228,7 +228,7 @@ local espNormalPokemon = Color3.fromRGB(255, 120, 50)
 local espRarePokemon = Color3.fromRGB(255, 80, 255)
 
 makeLegend("Normal Pokemon", espNormalPokemon, 72)
-makeLegend("Rare (Rainbow/Gradient/Alpha/etc.)", espRarePokemon, 94)
+makeLegend("Rare", espRarePokemon, 94)
 
 local espCountLabel = Instance.new("TextLabel")
 espCountLabel.Size = UDim2.new(1, 0, 0, 18)
@@ -425,11 +425,11 @@ espToggleBtn.MouseButton1Click:Connect(function()
 end)
 
 local COMMON_KYEGGOS = {
-    ["Kyeggo-rviolet"] = true, ["Kyeggo-rorange"] = true, ["Kyeggo-rred"] = true,
-    ["Kyeggo-blue"] = true, ["Kyeggo-green"] = true,
-    ["Kyeggo-pattern4"] = true, ["Kyeggo-pattern3"] = true,
-    ["Kyeggo-pattern2"] = true, ["Kyeggo-pattern1"] = true,
-    ["Kyeggo-faberge1"] = true, ["Kyeggo-faberge2"] = true, ["Kyeggo-faberge3"] = true,
+    ["Kyeggo-rviolet"] = true,["Kyeggo-rorange"] = true,["Kyeggo-rred"] = true,
+    ["Kyeggo-blue"] = true,["Kyeggo-green"] = true,
+    ["Kyeggo-pattern4"] = true,["Kyeggo-pattern3"] = true,
+    ["Kyeggo-pattern2"] = true,["Kyeggo-pattern1"] = true,
+    ["Kyeggo-faberge1"] = true,["Kyeggo-faberge2"] = true,["Kyeggo-faberge3"] = true,
     ["Kyeggo"] = true,
 }
 
@@ -475,7 +475,7 @@ task.spawn(function()
     end
 end)
 
--- Egg Collection (unchanged)
+-- Egg Collection
 local function isGroundEggPos(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
@@ -513,14 +513,33 @@ task.spawn(function()
     end
 end)
 
--- Improved Run Button Click
+-- On-Screen Debug + Improved Run Button
+local function showDebug(text, color)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 280, 0, 40)
+    notif.Position = UDim2.new(0.5, -140, 0, 60)
+    notif.BackgroundColor3 = color or Color3.fromRGB(30, 30, 45)
+    notif.BorderSizePixel = 0
+    notif.Parent = screenGui
+    Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 8)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -10, 1, 0)
+    lbl.Position = UDim2.new(0, 5, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.TextScaled = true
+    lbl.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+    lbl.Parent = notif
+    task.delay(2.8, function() if notif.Parent then notif:Destroy() end end)
+end
+
 local function clickRunButton()
     local vim = game:GetService("VirtualInputManager")
-    print("🔍 [Run Click] Searching for button...")
+    showDebug("🔍 Searching for Run button...", Color3.fromRGB(80, 80, 200))
 
     for _, gui in ipairs(player.PlayerGui:GetChildren()) do
         if gui.Name == "EggCollectorUI" or not gui:IsA("ScreenGui") or not gui.Enabled then continue end
-        
         for _, obj in ipairs(gui:GetDescendants()) do
             if not (obj:IsA("TextButton") or obj:IsA("ImageButton")) or not obj.Visible then continue end
 
@@ -538,7 +557,7 @@ local function clickRunButton()
                     task.wait(0.07)
                     vim:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
                 end)
-                print("✅ Clicked Run button! (" .. obj.Name .. ")")
+                showDebug("✅ Clicked Run Button!", Color3.fromRGB(80, 200, 80))
                 return true
             end
         end
@@ -553,11 +572,11 @@ local function clickRunButton()
         task.wait(0.08)
         vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
     end)
-    print("⚠️ Used fallback bottom-middle click")
+    showDebug("⚠️ Used Bottom Middle Fallback", Color3.fromRGB(255, 180, 0))
     return false
 end
 
--- Auto-Run Functions
+-- Helper Functions
 local function isKeeper(text)
     for name, _ in pairs(COMMON_KYEGGOS) do
         if text:find(name, 1, true) then return false, name end
@@ -625,7 +644,7 @@ task.spawn(function()
                 local fullText = getAllText(gui)
                 local keep, reason = isKeeper(fullText)
                 if keep then
-                    showNotif("⭐ KEEPER: " .. reason:upper() .. "!", Color3.fromRGB(255, 180, 0))
+                    showNotif("⭐ KEEPER FOUND!", Color3.fromRGB(255, 180, 0))
                     encounterLabel.Text = "Last: KEEPER"
                     encounterLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
                 else
@@ -645,4 +664,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ Kyeggo Egg Collector Loaded - Full Script with ImageButton Fix")
+print("✅ Full Script Loaded with On-Screen Debug")
