@@ -185,7 +185,7 @@ encounterLabel.TextScaled = true
 encounterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 encounterLabel.Parent = mainPanel
 
--- ESP Panel (unchanged)
+-- ESP Panel
 local espPanel = Instance.new("Frame")
 espPanel.Size = UDim2.new(1, 0, 1, -68)
 espPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -240,7 +240,7 @@ espCountLabel.TextScaled = true
 espCountLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 espCountLabel.Parent = espPanel
 
--- Scan Panel (unchanged)
+-- Scan Panel
 local scanPanel = Instance.new("Frame")
 scanPanel.Size = UDim2.new(1, 0, 1, -68)
 scanPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -357,7 +357,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ESP System (unchanged)
+-- ESP System
 local espLabels = {}
 
 local function makeESPLabel(part, text, color)
@@ -475,11 +475,10 @@ task.spawn(function()
     end
 end)
 
--- ==================== MODIFIED EGG COLLECTION ====================
+-- ==================== EGG COLLECTION ====================
 local function isGroundEggPos(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
-    if not obj.Parent or not obj.Parent.Name:lower():find("chunk") then return false, nil end
     return true, obj.Position
 end
 
@@ -490,26 +489,35 @@ local function collectEggs()
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    local originalCFrame = root.CFrame
     local eggsFound = 0
+    local playerPos = root.Position
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning or eggsFound >= MAX_PER_SWEEP then break end
 
         local ok, targetPos = isGroundEggPos(obj)
-        if ok then
+        if not ok then continue end
+
+        local parentName = (obj.Parent and obj.Parent.Name) or ""
+
+        -- Ground / Chunk eggs - always teleport
+        if parentName:lower():find("chunk") then
             eggsFound += 1
-            
-            -- Teleport TO the egg
             root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-            task.wait(0.25)  -- Stay at egg long enough for collection to trigger
-
-            -- Return to original position
-            root.CFrame = originalCFrame
-            task.wait(0.08)
-
+            task.wait(0.25)
             collected += 1
             counterLabel.Text = "Eggs Collected: " .. collected
+
+        -- Camera eggs - only teleport if OUT OF RANGE
+        elseif parentName:lower() == "camera" or obj.Parent == Camera then
+            local distance = (targetPos - playerPos).Magnitude
+            if distance > 50 then
+                eggsFound += 1
+                root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                task.wait(0.25)
+                collected += 1
+                counterLabel.Text = "Eggs Collected: " .. collected
+            end
         end
     end
 end
@@ -521,7 +529,7 @@ task.spawn(function()
     end
 end)
 
--- Rest of the script (debug, auto-run, etc.) unchanged
+-- On-Screen Debug + Auto Run Functions (unchanged)
 local function showDebug(text, color)
     local notif = Instance.new("Frame")
     notif.Size = UDim2.new(0, 280, 0, 40)
@@ -571,7 +579,6 @@ local function clickRunButton()
         end
     end
 
-    -- Fallback
     local vp = Camera.ViewportSize
     local x = vp.X * 0.5
     local y = vp.Y * 0.89
