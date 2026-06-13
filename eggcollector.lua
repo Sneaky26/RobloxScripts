@@ -185,7 +185,7 @@ encounterLabel.TextScaled = true
 encounterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 encounterLabel.Parent = mainPanel
 
--- ESP Panel
+-- ESP Panel (unchanged)
 local espPanel = Instance.new("Frame")
 espPanel.Size = UDim2.new(1, 0, 1, -68)
 espPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -240,7 +240,7 @@ espCountLabel.TextScaled = true
 espCountLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 espCountLabel.Parent = espPanel
 
--- Scan Panel
+-- Scan Panel (unchanged)
 local scanPanel = Instance.new("Frame")
 scanPanel.Size = UDim2.new(1, 0, 1, -68)
 scanPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -357,7 +357,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ESP System
+-- ESP System (unchanged)
 local espLabels = {}
 
 local function makeESPLabel(part, text, color)
@@ -475,7 +475,7 @@ task.spawn(function()
     end
 end)
 
--- Egg Collection
+-- ==================== MODIFIED EGG COLLECTION ====================
 local function isGroundEggPos(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
@@ -489,17 +489,25 @@ local function collectEggs()
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
+
     local originalCFrame = root.CFrame
     local eggsFound = 0
+
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning or eggsFound >= MAX_PER_SWEEP then break end
+
         local ok, targetPos = isGroundEggPos(obj)
         if ok then
             eggsFound += 1
+            
+            -- Teleport TO the egg
             root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-            task.wait(0.12)
+            task.wait(0.25)  -- Stay at egg long enough for collection to trigger
+
+            -- Return to original position
             root.CFrame = originalCFrame
             task.wait(0.08)
+
             collected += 1
             counterLabel.Text = "Eggs Collected: " .. collected
         end
@@ -513,7 +521,7 @@ task.spawn(function()
     end
 end)
 
--- On-Screen Debug + Improved Run Button
+-- Rest of the script (debug, auto-run, etc.) unchanged
 local function showDebug(text, color)
     local notif = Instance.new("Frame")
     notif.Size = UDim2.new(0, 280, 0, 40)
@@ -576,7 +584,6 @@ local function clickRunButton()
     return false
 end
 
--- Helper Functions
 local function isKeeper(text)
     for name, _ in pairs(COMMON_KYEGGOS) do
         if text:find(name, 1, true) then return false, name end
