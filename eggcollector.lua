@@ -9,7 +9,7 @@ local isMinimized = false
 local espEnabled = false
 local autoRunEnabled = false
 
--- ── Settings ─────────────────────────────────────────────────────────────────
+-- Settings
 local COLLECT_INTERVAL = 0.4
 local MAX_PER_SWEEP = 8
 
@@ -25,7 +25,7 @@ screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.DisplayOrder = 999
 screenGui.Parent = player.PlayerGui
 
--- ── Main Frame ───────────────────────────────────────────────────────────────
+-- Main Frame
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 280, 0, 310)
 frame.Position = UDim2.new(0.5, -140, 0, 20)
@@ -40,7 +40,6 @@ Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 35)
 titleBar.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-titleBar.BorderSizePixel = 0
 titleBar.Parent = frame
 Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
@@ -101,7 +100,7 @@ local tabMain = makeTab("Collector", 0)
 local tabEsp = makeTab("ESP", 0.333)
 local tabScan = makeTab("Scan", 0.666)
 
--- ── Main Panel ───────────────────────────────────────────────────────────────
+-- Main Panel
 local mainPanel = Instance.new("Frame")
 mainPanel.Size = UDim2.new(1, 0, 1, -68)
 mainPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -186,7 +185,7 @@ encounterLabel.TextScaled = true
 encounterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 encounterLabel.Parent = mainPanel
 
--- ── ESP Panel ────────────────────────────────────────────────────────────────
+-- ESP Panel
 local espPanel = Instance.new("Frame")
 espPanel.Size = UDim2.new(1, 0, 1, -68)
 espPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -228,17 +227,6 @@ end
 local espNormalPokemon = Color3.fromRGB(255, 120, 50)
 local espRarePokemon = Color3.fromRGB(255, 80, 255)
 
-local espInfoLabel = Instance.new("TextLabel")
-espInfoLabel.Size = UDim2.new(1, -10, 0, 16)
-espInfoLabel.Position = UDim2.new(0, 5, 0, 52)
-espInfoLabel.BackgroundTransparency = 1
-espInfoLabel.Text = "Labels all NPCs/Pokemon + currency eggs"
-espInfoLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
-espInfoLabel.TextSize = 10
-espInfoLabel.Font = Enum.Font.Code
-espInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-espInfoLabel.Parent = espPanel
-
 makeLegend("Normal Pokemon", espNormalPokemon, 72)
 makeLegend("Rare (Rainbow/Gradient/Alpha/etc.)", espRarePokemon, 94)
 
@@ -252,7 +240,7 @@ espCountLabel.TextScaled = true
 espCountLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 espCountLabel.Parent = espPanel
 
--- ── Scan Panel ───────────────────────────────────────────────────────────────
+-- Scan Panel
 local scanPanel = Instance.new("Frame")
 scanPanel.Size = UDim2.new(1, 0, 1, -68)
 scanPanel.Position = UDim2.new(0, 0, 0, 68)
@@ -319,23 +307,21 @@ end
 scanBtn.MouseButton1Click:Connect(function()
     clearScanLog()
     scanLog("=== BATTLE GUI SCAN ===", Color3.fromRGB(255, 220, 80))
-    local guiCount = 0
     for _, gui in ipairs(player.PlayerGui:GetChildren()) do
-        if gui.Name == "EggCollectorUI" or not gui:IsA("ScreenGui") or not gui.Enabled then continue end
-        guiCount += 1
+        if gui.Name == "EggCollectorUI" or not gui:IsA("ScreenGui") then continue end
         scanLog("GUI: " .. gui.Name, Color3.fromRGB(100, 200, 255))
         for _, obj in ipairs(gui:GetDescendants()) do
             if obj:IsA("TextButton") or obj:IsA("ImageButton") then
                 local txt = obj.Text or "(ImageButton)"
-                scanLog("  BTN: " .. obj.Name .. ' | Text="' .. txt .. '"', Color3.fromRGB(80, 255, 120))
-                scanLog("  Parent=" .. (obj.Parent and obj.Parent.Name or "?"), Color3.fromRGB(60, 200, 100))
+                scanLog("BTN: " .. obj.Name .. " | Text: " .. txt, Color3.fromRGB(80, 255, 120))
+                scanLog("   Parent: " .. (obj.Parent and obj.Parent.Name or "?"), Color3.fromRGB(60, 200, 100))
             end
         end
     end
-    scanLog("=== Done. " .. guiCount .. " GUI(s) ===", Color3.fromRGB(255, 220, 80))
+    scanLog("=== SCAN DONE ===", Color3.fromRGB(255, 220, 80))
 end)
 
--- ── Tab Switching ─────────────────────────────────────────────────────────────
+-- Tab Switching
 local function setTab(t)
     mainPanel.Visible = (t == "main")
     espPanel.Visible = (t == "esp")
@@ -351,7 +337,7 @@ tabMain.MouseButton1Click:Connect(function() setTab("main") end)
 tabEsp.MouseButton1Click:Connect(function() setTab("esp") end)
 tabScan.MouseButton1Click:Connect(function() setTab("scan") end)
 
--- ── Minimize ──────────────────────────────────────────────────────────────────
+-- Minimize
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
@@ -413,7 +399,10 @@ end
 
 local function removeESPLabel(part)
     local bb = espLabels[part]
-    if bb then bb:Destroy() espLabels[part] = nil end
+    if bb then
+        bb:Destroy()
+        espLabels[part] = nil
+    end
 end
 
 local function clearAllESP()
@@ -486,7 +475,7 @@ task.spawn(function()
     end
 end)
 
--- Ground Egg Collection (unchanged)
+-- Egg Collection (unchanged)
 local function isGroundEggPos(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
@@ -524,32 +513,38 @@ task.spawn(function()
     end
 end)
 
--- ── FIXED MOBILE RUN BUTTON ─────────────────────────────────────────────────
+-- Improved Run Button Click
 local function clickRunButton()
     local vim = game:GetService("VirtualInputManager")
-    print("🔍 Attempting Run click...")
+    print("🔍 [Run Click] Searching for button...")
 
-    -- Try to find real Run button
     for _, gui in ipairs(player.PlayerGui:GetChildren()) do
         if gui.Name == "EggCollectorUI" or not gui:IsA("ScreenGui") or not gui.Enabled then continue end
+        
         for _, obj in ipairs(gui:GetDescendants()) do
-            if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
-                local text = (obj.Text or ""):lower()
-                if text:find("run") then
-                    local pos = obj.AbsolutePosition + (obj.AbsoluteSize / 2)
-                    pcall(function()
-                        vim:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
-                        task.wait(0.07)
-                        vim:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
-                    end)
-                    print("✅ Clicked REAL Run button at " .. math.floor(pos.X) .. "," .. math.floor(pos.Y))
-                    return true
-                end
+            if not (obj:IsA("TextButton") or obj:IsA("ImageButton")) or not obj.Visible then continue end
+
+            local text = (obj.Text or ""):lower()
+            local name = obj.Name:lower()
+            local pName = (obj.Parent and obj.Parent.Name) or ""
+            local gpName = (obj.Parent and obj.Parent.Parent and obj.Parent.Parent.Name) or ""
+
+            if text:find("run") or name:find("run") or pName:find("run") or gpName:find("run") or
+               pName:find("option") or gpName:find("option") or pName:find("content") or gpName:find("content") then
+                
+                local pos = obj.AbsolutePosition + (obj.AbsoluteSize / 2)
+                pcall(function()
+                    vim:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
+                    task.wait(0.07)
+                    vim:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
+                end)
+                print("✅ Clicked Run button! (" .. obj.Name .. ")")
+                return true
             end
         end
     end
 
-    -- Bottom-middle fallback (you said ~10% up from bottom)
+    -- Fallback
     local vp = Camera.ViewportSize
     local x = vp.X * 0.5
     local y = vp.Y * 0.89
@@ -562,13 +557,13 @@ local function clickRunButton()
     return false
 end
 
--- Auto-Run System
+-- Auto-Run Functions
 local function isKeeper(text)
-    for name in pairs(COMMON_KYEGGOS) do
+    for name, _ in pairs(COMMON_KYEGGOS) do
         if text:find(name, 1, true) then return false, name end
     end
     if text:lower():find("kyeggo") then
-        return true, text:match("Kyeggo%S*") or "Variant"
+        return true, "Kyeggo Variant"
     end
     return false, nil
 end
@@ -576,7 +571,7 @@ end
 local function getAllText(gui)
     local texts = {}
     for _, obj in ipairs(gui:GetDescendants()) do
-        if (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) and obj.Text and obj.Text ~= "" then
+        if (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) and obj.Text and #obj.Text > 0 then
             table.insert(texts, obj.Text)
         end
     end
@@ -585,16 +580,14 @@ end
 
 local function isBattleGui(gui)
     if not gui:IsA("ScreenGui") then return false end
-    local hasRun, hasFight, hasLoomians = false, false, false
+    local hasRun, hasFight = false, false
     for _, obj in ipairs(gui:GetDescendants()) do
         if obj:IsA("TextButton") then
-            local txt = obj.Text or ""
-            if txt == "Run" then hasRun = true
-            elseif txt == "Fight" then hasFight = true
-            elseif txt == "Loomians" then hasLoomians = true end
+            if obj.Text == "Run" then hasRun = true
+            elseif obj.Text == "Fight" then hasFight = true end
         end
     end
-    return hasRun and hasFight and hasLoomians
+    return hasRun and hasFight
 end
 
 local function showNotif(text, color)
@@ -602,6 +595,7 @@ local function showNotif(text, color)
     notif.Size = UDim2.new(0, 260, 0, 44)
     notif.Position = UDim2.new(0.5, -130, 0, 10)
     notif.BackgroundColor3 = color or Color3.fromRGB(30, 30, 45)
+    notif.BorderSizePixel = 0
     notif.Parent = screenGui
     Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 10)
     local lbl = Instance.new("TextLabel")
@@ -613,7 +607,9 @@ local function showNotif(text, color)
     lbl.TextScaled = true
     lbl.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
     lbl.Parent = notif
-    task.delay(3.5, function() if notif.Parent then notif:Destroy() end end)
+    task.delay(3.5, function()
+        if notif and notif.Parent then notif:Destroy() end
+    end)
 end
 
 local watchedGuis = {}
@@ -630,7 +626,7 @@ task.spawn(function()
                 local keep, reason = isKeeper(fullText)
                 if keep then
                     showNotif("⭐ KEEPER: " .. reason:upper() .. "!", Color3.fromRGB(255, 180, 0))
-                    encounterLabel.Text = "Last: KEEPER (" .. reason .. ")"
+                    encounterLabel.Text = "Last: KEEPER"
                     encounterLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
                 else
                     showNotif("🏃 Auto-running in 3s...", Color3.fromRGB(80, 80, 120))
@@ -649,4 +645,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ Kyeggo Egg Collector FULLY LOADED - Mobile Run Button Fixed")
+print("✅ Kyeggo Egg Collector Loaded - Full Script with ImageButton Fix")
