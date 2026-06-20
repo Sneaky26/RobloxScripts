@@ -415,16 +415,18 @@ scanBtn.MouseButton1Click:Connect(function()
     scanLog("=== BATTLE GUI SCAN ===", Color3.fromRGB(255, 220, 80))
     local guiCount = 0
     for _, gui in ipairs(player.PlayerGui:GetChildren()) do
-        if gui.Name == "EggCollectorUI" or not gui:IsA("ScreenGui") or not gui.Enabled then continue end
+        if gui.Name == "EggCollectorUI" then continue end
+        -- removed the Enabled check so we catch hidden GUIs too
         guiCount += 1
-        scanLog("GUI: " .. gui.Name, Color3.fromRGB(100, 200, 255))
+        local enabledStr = gui.Enabled and "" or " [DISABLED]"
+        scanLog("GUI: " .. gui.Name .. enabledStr, Color3.fromRGB(100, 200, 255))
         for _, obj in ipairs(gui:GetDescendants()) do
             if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                local txt = obj.Text or "(ImageButton)"
-                scanLog("  BTN: " .. obj.Name .. ' | Text="' .. txt .. '"', Color3.fromRGB(80, 255, 120))
+                local txt = obj:IsA("TextButton") and obj.Text or "(ImageButton)"
+                local visStr = obj.Visible and "" or " [hidden]"
+                scanLog("  BTN: " .. obj.Name .. ' | Text="' .. txt .. '"' .. visStr, Color3.fromRGB(80, 255, 120))
                 scanLog("  Parent=" .. (obj.Parent and obj.Parent.Name or "?"), Color3.fromRGB(60, 200, 100))
 
-                -- Auto-cache if this looks like the Run button
                 if not isCacheValid() and (txt:lower():find("run") or obj.Name:lower():find("run")) then
                     cachedRunButton = obj
                     cachedRunGui    = gui
@@ -569,20 +571,14 @@ locLayout.Parent = locScroll
 -- Known locations table — add missing ones here later
 -- Format: { name, x, y, z }  (nil = not yet known)
 local LOCATIONS = {
-    { "Cheshma Town",   -220,  83,  -564 },
-    { "Route 3",       -1598, 103,  -398 },
-    { "Silvent City",  -1586, 160, -1110 },
-    { "Kanoko Village",-1027,  74, -1418 },
-    { "Rally Ranch",     524,  56,  -168 },
-    { "Route 8",         211, 333,  3448 },
-    { "Living District",-3027, 493, -704 },
-    -- missing — fill in after coord scan:
-    { "Heiwa Village",  nil,  nil,   nil },
-    { "Route 1",        nil,  nil,   nil },
-    { "Route 4",        nil,  nil,   nil },
-    { "Route 6",        nil,  nil,   nil },
-    { "Atlanthian City",nil,  nil,   nil },
-    { "Gale Forest",    nil,  nil,   nil },
+    { "Cheshma Town",    -220,   83,  -564 },
+    { "Route 3",         -1598,  103,  -398 },
+    { "Silvent City",    -1586,  160, -1110 },
+    { "Route 4 (Kanoko)",-1027,   74, -1418 },
+    { "Route 6 (Ranch)",  524,    56,  -168 },
+    { "Route 8",          211,   333,  3448 },
+    { "Atlanthian City", -3027,  493,  -704 },
+    { "Heiwa Village",   -621,    83, -2106 },
 }
 
 for _, loc in ipairs(LOCATIONS) do
@@ -842,17 +838,11 @@ local SWEEP_LOCATIONS = {
     { name = "Cheshma Town",    pos = Vector3.new(-220,   83,  -564) },
     { name = "Route 3",         pos = Vector3.new(-1598,  103,  -398) },
     { name = "Silvent City",    pos = Vector3.new(-1586,  160, -1110) },
-    { name = "Kanoko Village",  pos = Vector3.new(-1027,   74, -1418) },
-    { name = "Rally Ranch",     pos = Vector3.new( 524,    56,  -168) },
+    { name = "Route 4 (Kanoko)",pos = Vector3.new(-1027,   74, -1418) },
+    { name = "Route 6 (Ranch)", pos = Vector3.new( 524,    56,  -168) },
     { name = "Route 8",         pos = Vector3.new( 211,   333,  3448) },
-    { name = "Living District", pos = Vector3.new(-3027,  493,  -704) },
+    { name = "Atlanthian City", pos = Vector3.new(-3027,  493,  -704) },
     { name = "Heiwa Village",   pos = Vector3.new(-621,    83, -2106) },
-    -- fill these in after coord scan:
-    -- { name = "Route 1",         pos = Vector3.new(X, Y, Z) },
-    -- { name = "Route 4",         pos = Vector3.new(X, Y, Z) },
-    -- { name = "Route 6",         pos = Vector3.new(X, Y, Z) },
-    -- { name = "Atlanthian City", pos = Vector3.new(X, Y, Z) },
-    -- { name = "Gale Forest",     pos = Vector3.new(X, Y, Z) },
 }
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
