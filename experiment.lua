@@ -364,9 +364,35 @@ topBarScanBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", En
 topBarScanBtn.Parent = scanPanel
 Instance.new("UICorner", topBarScanBtn).CornerRadius = UDim.new(0, 6)
 
+-- Copy All button
+local copyAllBtn = Instance.new("TextButton")
+copyAllBtn.Size = UDim2.new(1, -10, 0, 26)
+copyAllBtn.Position = UDim2.new(0, 5, 0, 60)
+copyAllBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 80)
+copyAllBtn.Text = "📋 Copy All Results"
+copyAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyAllBtn.TextScaled = true
+copyAllBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+copyAllBtn.Parent = scanPanel
+Instance.new("UICorner", copyAllBtn).CornerRadius = UDim.new(0, 6)
+
+copyAllBtn.MouseButton1Click:Connect(function()
+    local lines = {}
+    for _, lbl in ipairs(scanEntries) do
+        table.insert(lines, lbl.Text)
+    end
+    if #lines == 0 then
+        copyAllBtn.Text = "❌ Nothing to copy"
+    else
+        setclipboard(table.concat(lines, "\n"))
+        copyAllBtn.Text = "✅ Copied!"
+    end
+    task.delay(2, function() copyAllBtn.Text = "📋 Copy All Results" end)
+end)
+
 local scanScroll = Instance.new("ScrollingFrame")
-scanScroll.Size = UDim2.new(1, -8, 1, -64)
-scanScroll.Position = UDim2.new(0, 4, 0, 62)
+scanScroll.Size = UDim2.new(1, -8, 1, -92)
+scanScroll.Position = UDim2.new(0, 4, 0, 90)
 scanScroll.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
 scanScroll.BorderSizePixel = 0
 scanScroll.ScrollBarThickness = 4
