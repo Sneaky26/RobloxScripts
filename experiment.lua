@@ -554,7 +554,7 @@ local LOCATIONS = {
     { "Route 8",         211, 333,  3448 },
     { "Living District",-3027, 493, -704 },
     -- missing — fill in after coord scan:
-    { "Heiwa Village",  nil,  nil,   nil },
+    { "Heiwa Village",  -625,  83, -2110 },
     { "Route 1",        nil,  nil,   nil },
     { "Route 4",        nil,  nil,   nil },
     { "Route 6",        nil,  nil,   nil },
