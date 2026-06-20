@@ -1,4 +1,3 @@
-
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
@@ -202,10 +201,34 @@ autoRunToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- Cache status label (new!) — shows user whether button is cached or not
+-- Auto-Sweep toggle (hourly location sweep)
+local autoSweepToggle = Instance.new("TextButton")
+autoSweepToggle.Size = UDim2.new(0.8, 0, 0, 30)
+autoSweepToggle.Position = UDim2.new(0.1, 0, 0, 138)
+autoSweepToggle.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+autoSweepToggle.Text = "Auto-Sweep: OFF"
+autoSweepToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoSweepToggle.TextScaled = true
+autoSweepToggle.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+autoSweepToggle.Parent = mainPanel
+Instance.new("UICorner", autoSweepToggle).CornerRadius = UDim.new(0, 8)
+
+autoSweepToggle.MouseButton1Click:Connect(function()
+    sweepEnabled = not sweepEnabled
+    if sweepEnabled then
+        autoSweepToggle.Text = "Auto-Sweep: ON"
+        autoSweepToggle.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+    else
+        autoSweepToggle.Text = "Auto-Sweep: OFF"
+        autoSweepToggle.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        sweepActive = false
+    end
+end)
+
+-- Cache status label
 local cacheLabel = Instance.new("TextLabel")
 cacheLabel.Size = UDim2.new(1, 0, 0, 18)
-cacheLabel.Position = UDim2.new(0, 0, 0, 140)
+cacheLabel.Position = UDim2.new(0, 0, 0, 174)
 cacheLabel.BackgroundTransparency = 1
 cacheLabel.Text = "Run Btn: Not cached yet"
 cacheLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
@@ -213,10 +236,10 @@ cacheLabel.TextScaled = true
 cacheLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 cacheLabel.Parent = mainPanel
 
--- Manual cache clear button (useful if game updates its UI)
+-- Manual cache clear button
 local clearCacheBtn = Instance.new("TextButton")
-clearCacheBtn.Size = UDim2.new(0.8, 0, 0, 24)
-clearCacheBtn.Position = UDim2.new(0.1, 0, 0, 162)
+clearCacheBtn.Size = UDim2.new(0.8, 0, 0, 22)
+clearCacheBtn.Position = UDim2.new(0.1, 0, 0, 196)
 clearCacheBtn.BackgroundColor3 = Color3.fromRGB(80, 60, 100)
 clearCacheBtn.Text = "Clear Cache"
 clearCacheBtn.TextColor3 = Color3.fromRGB(200, 180, 255)
@@ -233,7 +256,7 @@ end)
 
 local encounterLabel = Instance.new("TextLabel")
 encounterLabel.Size = UDim2.new(1, 0, 0, 18)
-encounterLabel.Position = UDim2.new(0, 0, 0, 192)
+encounterLabel.Position = UDim2.new(0, 0, 0, 224)
 encounterLabel.BackgroundTransparency = 1
 encounterLabel.Text = "Last Encounter: —"
 encounterLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
@@ -554,7 +577,7 @@ local LOCATIONS = {
     { "Route 8",         211, 333,  3448 },
     { "Living District",-3027, 493, -704 },
     -- missing — fill in after coord scan:
-    { "Heiwa Village",  -625,  83, -2110 },
+    { "Heiwa Village",  nil,  nil,   nil },
     { "Route 1",        nil,  nil,   nil },
     { "Route 4",        nil,  nil,   nil },
     { "Route 6",        nil,  nil,   nil },
@@ -678,7 +701,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
         scanPanel.Visible   = false
         coordsPanel.Visible = false
     else
-        frame.Size = UDim2.new(0, 280, 0, 310)
+        frame.Size = UDim2.new(0, 280, 0, 340)
         minimizeBtn.Text = "–"
         tabFrame.Visible    = true
         mainPanel.Visible   = true
@@ -803,14 +826,72 @@ task.spawn(function()
     end
 end)
 
--- ── Ground Egg Collection ─────────────────────────────────────────────────────
-local function isGroundEggPos(obj)
-    if not obj:IsA("MeshPart") then return false, nil end
-    if not obj.Name:lower():find("egg") then return false, nil end
-    if not obj.Parent or not obj.Parent.Name:lower():find("chunk") then return false, nil end
-    return true, obj.Position
+-- ── Settings ──────────────────────────────────────────────────────────────────
+local EGG_SCAN_RADIUS  = 150   -- studs: how close an egg must be to count
+local STREAM_WAIT      = 2.5   -- seconds to wait after TP for chunks to load
+local NO_EGG_TIMEOUT   = 5     -- seconds of no eggs before TPing to next location
+local MIN_SAFE_Y       = -100  -- below this Y = void/fell out of map
+
+-- ── Sweep state ───────────────────────────────────────────────────────────────
+local sweepEnabled    = false
+local sweepActive     = false
+local currentLocation = "—"
+
+-- ── Location table ────────────────────────────────────────────────────────────
+local SWEEP_LOCATIONS = {
+    { name = "Cheshma Town",    pos = Vector3.new(-220,   83,  -564) },
+    { name = "Route 3",         pos = Vector3.new(-1598,  103,  -398) },
+    { name = "Silvent City",    pos = Vector3.new(-1586,  160, -1110) },
+    { name = "Kanoko Village",  pos = Vector3.new(-1027,   74, -1418) },
+    { name = "Rally Ranch",     pos = Vector3.new( 524,    56,  -168) },
+    { name = "Route 8",         pos = Vector3.new( 211,   333,  3448) },
+    { name = "Living District", pos = Vector3.new(-3027,  493,  -704) },
+    { name = "Heiwa Village",   pos = Vector3.new(-621,    83, -2106) },
+    -- fill these in after coord scan:
+    -- { name = "Route 1",         pos = Vector3.new(X, Y, Z) },
+    -- { name = "Route 4",         pos = Vector3.new(X, Y, Z) },
+    -- { name = "Route 6",         pos = Vector3.new(X, Y, Z) },
+    -- { name = "Atlanthian City", pos = Vector3.new(X, Y, Z) },
+    -- { name = "Gale Forest",     pos = Vector3.new(X, Y, Z) },
+}
+
+-- ── Helpers ───────────────────────────────────────────────────────────────────
+local function isGroundEgg(obj)
+    if not obj:IsA("MeshPart") then return false end
+    if not obj.Name:lower():find("egg") then return false end
+    if not obj.Parent or not obj.Parent.Name:lower():find("chunk") then return false end
+    return true
 end
 
+local function eggsNearPos(pos)
+    local count = 0
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if isGroundEgg(obj) then
+            if (obj.Position - pos).Magnitude <= EGG_SCAN_RADIUS then
+                count += 1
+            end
+        end
+    end
+    return count
+end
+
+local function safeTeleport(targetPos)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    root.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
+    task.wait(STREAM_WAIT)
+    char = player.Character
+    root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    if root.Position.Y < MIN_SAFE_Y then
+        print("⚠️ Void detected at " .. tostring(targetPos) .. " — skipping")
+        return false
+    end
+    return true
+end
+
+-- ── Egg Collector loop ────────────────────────────────────────────────────────
 local function collectEggs()
     if not isRunning then return end
     local char = player.Character
@@ -821,10 +902,9 @@ local function collectEggs()
     local eggsFound = 0
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning or eggsFound >= MAX_PER_SWEEP then break end
-        local ok, targetPos = isGroundEggPos(obj)
-        if ok then
+        if isGroundEgg(obj) then
             eggsFound += 1
-            root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+            root.CFrame = CFrame.new(obj.Position + Vector3.new(0, 3, 0))
             task.wait(0.12)
             root.CFrame = originalCFrame
             task.wait(0.08)
@@ -839,6 +919,82 @@ task.spawn(function()
         pcall(collectEggs)
         task.wait(COLLECT_INTERVAL)
     end
+end)
+
+-- ── Continuous Location Sweep ─────────────────────────────────────────────────
+-- Cycles through all locations continuously.
+-- At each location: if no eggs for 5s straight → move to next.
+-- If eggs found → collect, reset timer, stay until 5s of no eggs passes.
+task.spawn(function()
+    local locIndex = 1
+
+    while true do
+        if not sweepEnabled then
+            task.wait(1)
+            continue
+        end
+
+        local loc = SWEEP_LOCATIONS[locIndex]
+        currentLocation = loc.name
+        statusLabel.Text = "TPing to: " .. loc.name
+        statusLabel.TextColor3 = Color3.fromRGB(180, 180, 80)
+        print("📍 Moving to " .. loc.name)
+
+        -- Pause collector while teleporting
+        isRunning = false
+
+        local safe = safeTeleport(loc.pos)
+        if not safe then
+            print("⛔ Skipped " .. loc.name .. " (unsafe)")
+            locIndex = (locIndex % #SWEEP_LOCATIONS) + 1
+            continue
+        end
+
+        -- Start collecting now that we're here
+        isRunning = true
+        toggleBtn.Text = "STOP"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+        statusLabel.Text = "@ " .. loc.name .. " — scanning..."
+        statusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+
+        -- Count down: 5 continuous seconds of no eggs = move on
+        local noEggTimer = 0
+        while sweepEnabled do
+            task.wait(1)
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if not root then break end
+
+            local count = eggsNearPos(root.Position)
+
+            if count > 0 then
+                -- Eggs here! Reset the timer and keep collecting
+                noEggTimer = 0
+                statusLabel.Text = "🥚 " .. loc.name .. " (" .. count .. " eggs)"
+                statusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+            else
+                noEggTimer += 1
+                local remaining = NO_EGG_TIMEOUT - noEggTimer
+                statusLabel.Text = "No eggs @ " .. loc.name .. " (" .. remaining .. "s)"
+                statusLabel.TextColor3 = Color3.fromRGB(220, 180, 60)
+
+                if noEggTimer >= NO_EGG_TIMEOUT then
+                    print("⏱️ No eggs for " .. NO_EGG_TIMEOUT .. "s at " .. loc.name .. " — moving on")
+                    break
+                end
+            end
+        end
+
+        -- Move to next location
+        locIndex = (locIndex % #SWEEP_LOCATIONS) + 1
+    end
+
+    -- Sweep turned off — stop collecting
+    isRunning = false
+    toggleBtn.Text = "START"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    statusLabel.Text = "Sweep stopped"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
 end)
 
 -- ── Click Run Button (cache-first, fallback second) ───────────────────────────
