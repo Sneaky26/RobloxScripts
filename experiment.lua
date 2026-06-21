@@ -10,6 +10,7 @@ local espEnabled = false
 -- ── Settings ─────────────────────────────────────────────────────────────────
 local COLLECT_INTERVAL = 0.4
 local MAX_PER_SWEEP = 8
+local MAX_ESP_DISTANCE = 20  -- studs
 
 -- Remove old UI
 local old = player.PlayerGui:FindFirstChild("EggCollectorUI")
@@ -177,7 +178,7 @@ local espInfoLabel = Instance.new("TextLabel")
 espInfoLabel.Size = UDim2.new(1, -10, 0, 16)
 espInfoLabel.Position = UDim2.new(0, 5, 0, 52)
 espInfoLabel.BackgroundTransparency = 1
-espInfoLabel.Text = "Labels all Kyeggo models with original names"
+espInfoLabel.Text = "Box + Text ESP (20 studs range)"
 espInfoLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
 espInfoLabel.TextSize = 10
 espInfoLabel.Font = Enum.Font.Code
@@ -226,58 +227,65 @@ minimizeBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ESP System
-local espLabels = {}
+local espData = {}  -- part -> {highlight, billboard}
 
-local function makeESPLabel(part, text, color)
-    if espLabels[part] then return end
+local function createESP(model)
+    local root = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+    if not root or espData[root] then return end
+
+    local isRare = model.Name:lower():find("rainbow") or model.Name:lower():find("alpha") or model.Name:lower():find("gradient")
+    local color = isRare and espRare or espNormal
+    local prefix = isRare and "⭐ " or ""
+
+    -- Box Overlay (Highlight)
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "EggESP_Box"
+    highlight.FillTransparency = 0.85
+    highlight.OutlineTransparency = 0
+    highlight.OutlineColor = color
+    highlight.FillColor = color
+    highlight.Adornee = model
+    highlight.Parent = model
+
+    -- Text Label
     local bb = Instance.new("BillboardGui")
-    bb.Name = "EggESP"
-    bb.Size = UDim2.new(0, 220, 0, 36)  -- Bigger for larger text
+    bb.Name = "EggESP_Text"
+    bb.Size = UDim2.new(0, 220, 0, 36)
     bb.StudsOffset = Vector3.new(0, 4, 0)
     bb.AlwaysOnTop = true
-    bb.MaxDistance = 350
-    bb.Adornee = part
-    bb.Parent = part
-    
+    bb.MaxDistance = MAX_ESP_DISTANCE + 5
+    bb.Adornee = root
+    bb.Parent = model
+
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 1, 0)
     bg.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    bg.BackgroundTransparency = 0.35
+    bg.BackgroundTransparency = 0.4
     bg.BorderSizePixel = 0
     bg.Parent = bb
     Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 5)
-
-    local stripe = Instance.new("Frame")
-    stripe.Size = UDim2.new(0, 4, 1, 0)
-    stripe.BackgroundColor3 = color
-    stripe.BorderSizePixel = 0
-    stripe.Parent = bg
-    Instance.new("UICorner", stripe).CornerRadius = UDim.new(0, 4)
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, -12, 1, 0)
     lbl.Position = UDim2.new(0, 9, 0, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text = text
+    lbl.Text = prefix .. model.Name
     lbl.TextColor3 = color
-    lbl.TextSize = 16          -- ← Larger text
+    lbl.TextSize = 16
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.TextTruncate = Enum.TextTruncate.AtEnd
     lbl.Parent = bg
 
-    espLabels[part] = bb
+    espData[root] = {highlight = highlight, billboard = bb}
 end
 
-local function removeESPLabel(part)
-    local bb = espLabels[part]
-    if bb then bb:Destroy() espLabels[part] = nil end
-end
-
-local function clearAllESP()
-    for part, bb in pairs(espLabels) do
-        if bb and bb.Parent then bb:Destroy() end
-        espLabels[part] = nil
+local function removeESP(root)
+    local data = espData[root]
+    if data then
+        if data.highlight then data.highlight:Destroy() end
+        if data.billboard then data.billboard:Destroy() end
+        espData[root] = nil
     end
 end
 
@@ -289,7 +297,9 @@ espToggleBtn.MouseButton1Click:Connect(function()
     else
         espToggleBtn.Text = "ESP: OFF"
         espToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        clearAllESP()
+        for root in pairs(espData) do
+            removeESP(root)
+        end
     end
 end)
 
@@ -300,38 +310,49 @@ local function isPlayerCharacter(model)
     return false
 end
 
-local function getModelRoot(model)
-    if model.PrimaryPart then return model.PrimaryPart end
-    return model:FindFirstChildWhichIsA("BasePart", true)
-end
-
 task.spawn(function()
     while true do
-        task.wait(0.5)
+        task.wait(0.4)
         if not espEnabled then continue end
-        local seenParts = {}
+
+        local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then continue end
+
+        local seen = {}
         local count = 0
+
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if not obj:IsA("Model") or not obj.Name:lower():find("kyeggo") or isPlayerCharacter(obj) then continue end
-            local root = getModelRoot(obj)
+
+            local root = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
             if not root then continue end
-            seenParts[root] = true
+
+            local distance = (root.Position - rootPart.Position).Magnitude
+            if distance > MAX_ESP_DISTANCE then 
+                removeESP(root)
+                continue 
+            end
+
+            seen[root] = true
             count += 1
-            if not espLabels[root] then
-                local isRare = obj.Name:lower():find("rainbow") or obj.Name:lower():find("alpha") or obj.Name:lower():find("gradient")
-                local prefix = isRare and "⭐ " or ""
-                local color = isRare and espRare or espNormal
-                makeESPLabel(root, prefix .. obj.Name, color)
+
+            if not espData[root] then
+                createESP(obj)
             end
         end
-        for part in pairs(espLabels) do
-            if not seenParts[part] or not part.Parent then removeESPLabel(part) end
+
+        -- Cleanup old ESP
+        for root in pairs(espData) do
+            if not seen[root] or not root.Parent then
+                removeESP(root)
+            end
         end
+
         espCountLabel.Text = "Models visible: " .. count
     end
 end)
 
--- Auto Egg Collection
+-- Auto Egg Collection (unchanged)
 local function isGroundEggPos(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
@@ -369,4 +390,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ Egg Collector LOADED - Larger ESP Text")
+print("✅ Egg Collector LOADED - Box ESP + 20 Studs Range")
