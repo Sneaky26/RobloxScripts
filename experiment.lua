@@ -74,7 +74,7 @@ closeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.Fo
 closeBtn.Parent = titleBar
 closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
--- Tabs (Collector + ESP)
+-- Tabs
 local tabFrame = Instance.new("Frame")
 tabFrame.Size = UDim2.new(1, 0, 0, 28)
 tabFrame.Position = UDim2.new(0, 0, 0, 36)
@@ -232,10 +232,10 @@ local function makeESPLabel(part, text, color)
     if espLabels[part] then return end
     local bb = Instance.new("BillboardGui")
     bb.Name = "EggESP"
-    bb.Size = UDim2.new(0, 200, 0, 28)
-    bb.StudsOffset = Vector3.new(0, 3.5, 0)
+    bb.Size = UDim2.new(0, 220, 0, 36)  -- Bigger for larger text
+    bb.StudsOffset = Vector3.new(0, 4, 0)
     bb.AlwaysOnTop = true
-    bb.MaxDistance = 300
+    bb.MaxDistance = 350
     bb.Adornee = part
     bb.Parent = part
     
@@ -255,12 +255,12 @@ local function makeESPLabel(part, text, color)
     Instance.new("UICorner", stripe).CornerRadius = UDim.new(0, 4)
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -8, 1, 0)
-    lbl.Position = UDim2.new(0, 7, 0, 0)
+    lbl.Size = UDim2.new(1, -12, 1, 0)
+    lbl.Position = UDim2.new(0, 9, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = color
-    lbl.TextSize = 11
+    lbl.TextSize = 16          -- ← Larger text
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.TextTruncate = Enum.TextTruncate.AtEnd
@@ -369,4 +369,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ Egg Collector LOADED - Auto Collect + ESP")
+print("✅ Egg Collector LOADED - Larger ESP Text")
