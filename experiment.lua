@@ -431,89 +431,91 @@ task.spawn(function()
 end)
 
 -- ── FPS Boost System ─────────────────────────────────────────────────────────
--- Tracks which parts we hid so we can restore them
+-- key = object, value = original Transparency before we hid it
 local hiddenObjects = {}
 
--- Keywords to identify things to KEEP visible
+-- Returns true if this part should be KEPT visible no matter what
 local function shouldKeep(obj)
-    if not obj:IsA("BasePart") and not obj:IsA("UnionOperation") and not obj:IsA("MeshPart") then
-        return true -- not a part, skip
-    end
     local nameLower = obj.Name:lower()
-    -- Keep ground/terrain/baseplate
-    if nameLower:find("ground") or nameLower:find("base") or nameLower:find("terrain")
+
+    -- Always keep eggs
+    if nameLower:find("egg") then return true end
+
+    -- Always keep Kyeggo NPCs
+    if nameLower:find("kyeggo") then return true end
+
+    -- Keep ground / floor / baseplate type names
+    if nameLower:find("ground") or nameLower:find("baseplate") or nameLower:find("base")
     or nameLower:find("floor") or nameLower:find("grass") or nameLower:find("dirt")
-    or nameLower:find("road") or nameLower:find("path") or nameLower:find("sand") then
+    or nameLower:find("terrain") or nameLower:find("road") or nameLower:find("path")
+    or nameLower:find("sand") or nameLower:find("water") then
         return true
     end
-    -- Keep eggs
-    if nameLower:find("egg") then return true end
-    -- Keep Kyeggo models
-    if nameLower:find("kyeggo") then return true end
-    -- Keep player characters
+
+    -- Keep player characters (self + others)
     for _, p in ipairs(Players:GetPlayers()) do
         local char = p.Character
         if char and obj:IsDescendantOf(char) then return true end
     end
-    return false
-end
 
-local function shouldHide(obj)
-    -- Only target BaseParts, MeshParts, Unions (visual decorative geometry)
-    if not (obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("UnionOperation")) then
-        return false
+    -- Keep anything parented under Kyeggo models (their body parts)
+    local ancestor = obj.Parent
+    while ancestor and ancestor ~= Workspace do
+        if ancestor.Name:lower():find("kyeggo") then return true end
+        ancestor = ancestor.Parent
     end
-    if shouldKeep(obj) then return false end
-    -- Hide big decorative structures: buildings, props, walls, etc.
-    local nameLower = obj.Name:lower()
-    if nameLower:find("wall") or nameLower:find("build") or nameLower:find("house")
-    or nameLower:find("tree") or nameLower:find("bush") or nameLower:find("fence")
-    or nameLower:find("rock") or nameLower:find("stone") or nameLower:find("prop")
-    or nameLower:find("decoration") or nameLower:find("deco") or nameLower:find("pillar")
-    or nameLower:find("roof") or nameLower:find("ceiling") or nameLower:find("lamp")
-    or nameLower:find("light") or nameLower:find("post") or nameLower:find("sign")
-    or nameLower:find("chunk") or nameLower:find("struct") or nameLower:find("platform")
-    or nameLower:find("bridge") then
-        return true
-    end
+
     return false
 end
 
 local function applyFpsBoost()
     local count = 0
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if shouldHide(obj) and obj.LocalTransparencyModifier ~= nil then
+        -- Target all visible geometry parts
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("SpecialMesh")
+        or obj:IsA("UnionOperation") or obj:IsA("PartOperation") then
+            if not hiddenObjects[obj] and not shouldKeep(obj) then
+                local ok, original = pcall(function() return obj.Transparency end)
+                if ok and original < 1 then
+                    hiddenObjects[obj] = original
+                    pcall(function() obj.Transparency = 1 end)
+                    count += 1
+                end
+            end
+        end
+        -- Hide Decals, Textures, and SurfaceAppearances (extra visual noise)
+        if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("SurfaceAppearance") then
             if not hiddenObjects[obj] then
-                hiddenObjects[obj] = obj.LocalTransparencyModifier
-                pcall(function() obj.LocalTransparencyModifier = 1 end)
-                count += 1
+                local ok, original = pcall(function() return obj.Transparency end)
+                if ok then
+                    hiddenObjects[obj] = original
+                    pcall(function() obj.Transparency = 1 end)
+                    count += 1
+                end
             end
         end
     end
-    -- Also handle Workspace.Terrain decorations
-    if Workspace:FindFirstChildOfClass("Terrain") then
-        local terrain = Workspace:FindFirstChildOfClass("Terrain")
-        pcall(function() terrain.Decoration = false end)
-    end
-    fpsStatusLabel.Text = "Hidden: " .. count .. " objects"
+
+    -- Disable terrain decoration
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if terrain then pcall(function() terrain.Decoration = false end) end
+
+    fpsStatusLabel.Text = "Hidden: " .. count .. " objects ✓"
 end
 
 local function removeFpsBoost()
-    local count = 0
-    for obj, originalTransp in pairs(hiddenObjects) do
+    for obj, original in pairs(hiddenObjects) do
         pcall(function()
             if obj and obj.Parent then
-                obj.LocalTransparencyModifier = originalTransp
-                count += 1
+                obj.Transparency = original
             end
         end)
     end
     hiddenObjects = {}
-    -- Restore terrain decoration
-    if Workspace:FindFirstChildOfClass("Terrain") then
-        local terrain = Workspace:FindFirstChildOfClass("Terrain")
-        pcall(function() terrain.Decoration = true end)
-    end
+
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if terrain then pcall(function() terrain.Decoration = true end) end
+
     fpsStatusLabel.Text = "Objects hidden: 0"
 end
 
