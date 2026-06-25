@@ -1,16 +1,16 @@
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
 local player = Players.LocalPlayer
 
 local collected = 0
 local isRunning = false
 local isMinimized = false
 local espEnabled = false
+local fpsBoostEnabled = false
 
--- ── Settings ─────────────────────────────────────────────────────────────────
 local COLLECT_INTERVAL = 0.4
 local MAX_PER_SWEEP = 8
-local MAX_ESP_DISTANCE = 20  -- studs
 
 -- Remove old UI
 local old = player.PlayerGui:FindFirstChild("EggCollectorUI")
@@ -24,39 +24,45 @@ screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.DisplayOrder = 999
 screenGui.Parent = player.PlayerGui
 
--- ── Main Frame ───────────────────────────────────────────────────────────────
+-- ── Main Frame (compact) ─────────────────────────────────────────────────────
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 310)
-frame.Position = UDim2.new(0.5, -140, 0, 20)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+frame.Size = UDim2.new(0, 240, 0, 270)
+frame.Position = UDim2.new(0.5, -120, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
--- Title Bar
+-- Subtle border
+local border = Instance.new("UIStroke")
+border.Color = Color3.fromRGB(60, 60, 90)
+border.Thickness = 1
+border.Parent = frame
+
+-- ── Title Bar ────────────────────────────────────────────────────────────────
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 35)
-titleBar.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+titleBar.Size = UDim2.new(1, 0, 0, 32)
+titleBar.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
 titleBar.BorderSizePixel = 0
 titleBar.Parent = frame
-Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -80, 1, 0)
-title.Position = UDim2.new(0, 8, 0, 0)
+title.Size = UDim2.new(1, -70, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "Egg Collector"
+title.Text = "🥚 Kyeggo Collector"
 title.TextColor3 = Color3.fromRGB(255, 220, 80)
 title.TextScaled = true
 title.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 title.Parent = titleBar
 
 local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Size = UDim2.new(0, 28, 0, 28)
-minimizeBtn.Position = UDim2.new(1, -64, 0, 4)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(80, 150, 255)
+minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
+minimizeBtn.Position = UDim2.new(1, -56, 0, 4)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 220)
 minimizeBtn.Text = "–"
 minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeBtn.TextScaled = true
@@ -65,30 +71,31 @@ minimizeBtn.Parent = titleBar
 Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 6)
 
 local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 28, 0, 28)
-closeBtn.Position = UDim2.new(1, -32, 0, 4)
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -28, 0, 4)
 closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeBtn.Text = "X"
+closeBtn.Text = "✕"
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.TextScaled = true
 closeBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 closeBtn.Parent = titleBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
--- Tabs
+-- ── Tabs ─────────────────────────────────────────────────────────────────────
 local tabFrame = Instance.new("Frame")
-tabFrame.Size = UDim2.new(1, 0, 0, 28)
-tabFrame.Position = UDim2.new(0, 0, 0, 36)
+tabFrame.Size = UDim2.new(1, -12, 0, 26)
+tabFrame.Position = UDim2.new(0, 6, 0, 35)
 tabFrame.BackgroundTransparency = 1
 tabFrame.Parent = frame
 
-local function makeTab(text, xPos)
+local function makeTab(text, xFrac)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.5, -3, 1, 0)
-    btn.Position = UDim2.new(xPos, 2, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    btn.Size = UDim2.new(0.333, -3, 1, 0)
+    btn.Position = UDim2.new(xFrac, 2, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
     btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    btn.TextColor3 = Color3.fromRGB(170, 170, 170)
     btn.TextScaled = true
     btn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
     btn.Parent = tabFrame
@@ -96,212 +103,233 @@ local function makeTab(text, xPos)
     return btn
 end
 
-local tabMain = makeTab("Collector", 0)
-local tabEsp = makeTab("ESP", 0.5)
+local tabMain = makeTab("Collect", 0)
+local tabEsp  = makeTab("ESP", 0.333)
+local tabFps  = makeTab("FPS", 0.666)
 
--- ── Main Panel ───────────────────────────────────────────────────────────────
+-- ── MAIN PANEL ───────────────────────────────────────────────────────────────
 local mainPanel = Instance.new("Frame")
-mainPanel.Size = UDim2.new(1, 0, 1, -68)
-mainPanel.Position = UDim2.new(0, 0, 0, 68)
+mainPanel.Size = UDim2.new(1, -12, 1, -68)
+mainPanel.Position = UDim2.new(0, 6, 0, 65)
 mainPanel.BackgroundTransparency = 1
 mainPanel.Parent = frame
 
+-- Stats row
+local statsRow = Instance.new("Frame")
+statsRow.Size = UDim2.new(1, 0, 0, 38)
+statsRow.Position = UDim2.new(0, 0, 0, 0)
+statsRow.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+statsRow.BorderSizePixel = 0
+statsRow.Parent = mainPanel
+Instance.new("UICorner", statsRow).CornerRadius = UDim.new(0, 8)
+
 local counterLabel = Instance.new("TextLabel")
-counterLabel.Size = UDim2.new(1, 0, 0, 25)
-counterLabel.Position = UDim2.new(0, 0, 0, 8)
+counterLabel.Size = UDim2.new(0.5, 0, 1, 0)
 counterLabel.BackgroundTransparency = 1
-counterLabel.Text = "Eggs Collected: 0"
-counterLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+counterLabel.Text = "🥚 0"
+counterLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
 counterLabel.TextScaled = true
-counterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
-counterLabel.Parent = mainPanel
+counterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+counterLabel.Parent = statsRow
 
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, 0, 0, 20)
-statusLabel.Position = UDim2.new(0, 0, 0, 36)
+statusLabel.Size = UDim2.new(0.5, 0, 1, 0)
+statusLabel.Position = UDim2.new(0.5, 0, 0, 0)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: OFF"
+statusLabel.Text = "OFF"
 statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
 statusLabel.TextScaled = true
-statusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
-statusLabel.Parent = mainPanel
+statusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+statusLabel.Parent = statsRow
 
+-- BIG START BUTTON
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-toggleBtn.Position = UDim2.new(0.1, 0, 0, 62)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-toggleBtn.Text = "START"
+toggleBtn.Size = UDim2.new(1, 0, 0, 110)
+toggleBtn.Position = UDim2.new(0, 0, 0, 44)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+toggleBtn.Text = "▶  START"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.TextScaled = true
 toggleBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 toggleBtn.Parent = mainPanel
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 12)
+
+-- Subtle inner shadow effect via UIStroke
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(255, 255, 255)
+btnStroke.Transparency = 0.85
+btnStroke.Thickness = 1.5
+btnStroke.Parent = toggleBtn
 
 toggleBtn.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
-        toggleBtn.Text = "STOP"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
-        statusLabel.Text = "Status: ON"
-        statusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+        toggleBtn.Text = "⏹  STOP"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(210, 55, 55)
+        statusLabel.Text = "ON"
+        statusLabel.TextColor3 = Color3.fromRGB(80, 255, 100)
     else
-        toggleBtn.Text = "START"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        statusLabel.Text = "Status: OFF"
+        toggleBtn.Text = "▶  START"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+        statusLabel.Text = "OFF"
         statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
     end
 end)
 
--- ── ESP Panel ────────────────────────────────────────────────────────────────
+local encounterLabel = Instance.new("TextLabel")
+encounterLabel.Size = UDim2.new(1, 0, 0, 16)
+encounterLabel.Position = UDim2.new(0, 0, 0, 160)
+encounterLabel.BackgroundTransparency = 1
+encounterLabel.Text = "Last: —"
+encounterLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
+encounterLabel.TextScaled = true
+encounterLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
+encounterLabel.Parent = mainPanel
+
+-- ── ESP PANEL ────────────────────────────────────────────────────────────────
 local espPanel = Instance.new("Frame")
-espPanel.Size = UDim2.new(1, 0, 1, -68)
-espPanel.Position = UDim2.new(0, 0, 0, 68)
+espPanel.Size = UDim2.new(1, -12, 1, -68)
+espPanel.Position = UDim2.new(0, 6, 0, 65)
 espPanel.BackgroundTransparency = 1
 espPanel.Visible = false
 espPanel.Parent = frame
 
 local espToggleBtn = Instance.new("TextButton")
-espToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-espToggleBtn.Position = UDim2.new(0.1, 0, 0, 10)
+espToggleBtn.Size = UDim2.new(1, 0, 0, 46)
+espToggleBtn.Position = UDim2.new(0, 0, 0, 0)
 espToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 espToggleBtn.Text = "ESP: OFF"
 espToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 espToggleBtn.TextScaled = true
 espToggleBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
 espToggleBtn.Parent = espPanel
-Instance.new("UICorner", espToggleBtn).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", espToggleBtn).CornerRadius = UDim.new(0, 10)
 
-local espNormal = Color3.fromRGB(255, 120, 50)
-local espRare = Color3.fromRGB(255, 80, 255)
+local espNormalColor = Color3.fromRGB(255, 120, 50)
+local espRareColor   = Color3.fromRGB(255, 80, 255)
 
-local espInfoLabel = Instance.new("TextLabel")
-espInfoLabel.Size = UDim2.new(1, -10, 0, 16)
-espInfoLabel.Position = UDim2.new(0, 5, 0, 52)
-espInfoLabel.BackgroundTransparency = 1
-espInfoLabel.Text = "Box + Text ESP (20 studs range)"
-espInfoLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
-espInfoLabel.TextSize = 10
-espInfoLabel.Font = Enum.Font.Code
-espInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-espInfoLabel.Parent = espPanel
+local function makeLegendEntry(labelText, color, yPos)
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 10, 0, 10)
+    dot.Position = UDim2.new(0, 4, 0, yPos + 4)
+    dot.BackgroundColor3 = color
+    dot.BorderSizePixel = 0
+    dot.Parent = espPanel
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -22, 0, 18)
+    lbl.Position = UDim2.new(0, 20, 0, yPos)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = labelText
+    lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+    lbl.TextSize = 11
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = espPanel
+end
+
+makeLegendEntry("Normal Kyeggo", espNormalColor, 54)
+makeLegendEntry("Rare / Rainbow / Alpha", espRareColor, 76)
 
 local espCountLabel = Instance.new("TextLabel")
-espCountLabel.Size = UDim2.new(1, 0, 0, 18)
-espCountLabel.Position = UDim2.new(0, 0, 0, 120)
+espCountLabel.Size = UDim2.new(1, 0, 0, 20)
+espCountLabel.Position = UDim2.new(0, 0, 0, 106)
 espCountLabel.BackgroundTransparency = 1
-espCountLabel.Text = "Models visible: 0"
-espCountLabel.TextColor3 = Color3.fromRGB(0, 255, 180)
+espCountLabel.Text = "Visible: 0"
+espCountLabel.TextColor3 = Color3.fromRGB(0, 220, 160)
 espCountLabel.TextScaled = true
 espCountLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
 espCountLabel.Parent = espPanel
 
--- Tab Switching
+-- ── FPS PANEL ────────────────────────────────────────────────────────────────
+local fpsPanel = Instance.new("Frame")
+fpsPanel.Size = UDim2.new(1, -12, 1, -68)
+fpsPanel.Position = UDim2.new(0, 6, 0, 65)
+fpsPanel.BackgroundTransparency = 1
+fpsPanel.Visible = false
+fpsPanel.Parent = frame
+
+local fpsInfo = Instance.new("TextLabel")
+fpsInfo.Size = UDim2.new(1, 0, 0, 44)
+fpsInfo.Position = UDim2.new(0, 0, 0, 0)
+fpsInfo.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+fpsInfo.BorderSizePixel = 0
+fpsInfo.Text = "Hides buildings & props.\nKeeps ground & eggs visible."
+fpsInfo.TextColor3 = Color3.fromRGB(160, 160, 180)
+fpsInfo.TextScaled = true
+fpsInfo.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
+fpsInfo.TextWrapped = true
+fpsInfo.Parent = fpsPanel
+Instance.new("UICorner", fpsInfo).CornerRadius = UDim.new(0, 8)
+
+local fpsToggleBtn = Instance.new("TextButton")
+fpsToggleBtn.Size = UDim2.new(1, 0, 0, 56)
+fpsToggleBtn.Position = UDim2.new(0, 0, 0, 52)
+fpsToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 140, 30)
+fpsToggleBtn.Text = "FPS Boost: OFF"
+fpsToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+fpsToggleBtn.TextScaled = true
+fpsToggleBtn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+fpsToggleBtn.Parent = fpsPanel
+Instance.new("UICorner", fpsToggleBtn).CornerRadius = UDim.new(0, 10)
+
+local fpsStatusLabel = Instance.new("TextLabel")
+fpsStatusLabel.Size = UDim2.new(1, 0, 0, 16)
+fpsStatusLabel.Position = UDim2.new(0, 0, 0, 116)
+fpsStatusLabel.BackgroundTransparency = 1
+fpsStatusLabel.Text = "Objects hidden: 0"
+fpsStatusLabel.TextColor3 = Color3.fromRGB(140, 200, 140)
+fpsStatusLabel.TextScaled = true
+fpsStatusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json")
+fpsStatusLabel.Parent = fpsPanel
+
+-- ── Tab Switching ─────────────────────────────────────────────────────────────
 local function setTab(t)
     mainPanel.Visible = (t == "main")
-    espPanel.Visible = (t == "esp")
-    local active = Color3.fromRGB(60, 100, 180)
-    local inactive = Color3.fromRGB(40, 40, 55)
-    tabMain.BackgroundColor3 = t=="main" and active or inactive
-    tabEsp.BackgroundColor3 = t=="esp" and active or inactive
+    espPanel.Visible  = (t == "esp")
+    fpsPanel.Visible  = (t == "fps")
+    local active   = Color3.fromRGB(55, 90, 170)
+    local inactive = Color3.fromRGB(35, 35, 50)
+    tabMain.BackgroundColor3 = t == "main" and active or inactive
+    tabEsp.BackgroundColor3  = t == "esp"  and active or inactive
+    tabFps.BackgroundColor3  = t == "fps"  and active or inactive
 end
 setTab("main")
 tabMain.MouseButton1Click:Connect(function() setTab("main") end)
-tabEsp.MouseButton1Click:Connect(function() setTab("esp") end)
+tabEsp.MouseButton1Click:Connect(function()  setTab("esp")  end)
+tabFps.MouseButton1Click:Connect(function()  setTab("fps")  end)
 
--- Minimize
+-- ── Minimize ──────────────────────────────────────────────────────────────────
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 280, 0, 35)
+        frame.Size = UDim2.new(0, 240, 0, 32)
         minimizeBtn.Text = "□"
         tabFrame.Visible = false
         mainPanel.Visible = false
         espPanel.Visible = false
+        fpsPanel.Visible = false
     else
-        frame.Size = UDim2.new(0, 280, 0, 310)
+        frame.Size = UDim2.new(0, 240, 0, 270)
         minimizeBtn.Text = "–"
         tabFrame.Visible = true
-        mainPanel.Visible = true
-        espPanel.Visible = false
+        setTab("main")
     end
 end)
 
--- ESP System
-local espData = {}  -- part -> {highlight, billboard}
+-- ── ESP System ────────────────────────────────────────────────────────────────
+local espLabels = {}
 
-local function createESP(model)
-    local root = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
-    if not root or espData[root] then return end
+local COMMON_KYEGGOS = {
+    ["Kyeggo-rviolet"] = true, ["Kyeggo-rorange"] = true, ["Kyeggo-rred"] = true,
+    ["Kyeggo-blue"] = true, ["Kyeggo-green"] = true,
+    ["Kyeggo-pattern4"] = true, ["Kyeggo-pattern3"] = true,
+    ["Kyeggo-pattern2"] = true, ["Kyeggo-pattern1"] = true,
+    ["Kyeggo-faberge1"] = true, ["Kyeggo-faberge2"] = true, ["Kyeggo-faberge3"] = true,
+    ["Kyeggo"] = true,
+}
 
-    local isRare = model.Name:lower():find("rainbow") or model.Name:lower():find("alpha") or model.Name:lower():find("gradient")
-    local color = isRare and espRare or espNormal
-    local prefix = isRare and "⭐ " or ""
-
-    -- Box Overlay (Highlight)
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "EggESP_Box"
-    highlight.FillTransparency = 0.85
-    highlight.OutlineTransparency = 0
-    highlight.OutlineColor = color
-    highlight.FillColor = color
-    highlight.Adornee = model
-    highlight.Parent = model
-
-    -- Text Label
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "EggESP_Text"
-    bb.Size = UDim2.new(0, 220, 0, 36)
-    bb.StudsOffset = Vector3.new(0, 4, 0)
-    bb.AlwaysOnTop = true
-    bb.MaxDistance = MAX_ESP_DISTANCE + 5
-    bb.Adornee = root
-    bb.Parent = model
-
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    bg.BackgroundTransparency = 0.4
-    bg.BorderSizePixel = 0
-    bg.Parent = bb
-    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 5)
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -12, 1, 0)
-    lbl.Position = UDim2.new(0, 9, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = prefix .. model.Name
-    lbl.TextColor3 = color
-    lbl.TextSize = 16
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextTruncate = Enum.TextTruncate.AtEnd
-    lbl.Parent = bg
-
-    espData[root] = {highlight = highlight, billboard = bb}
-end
-
-local function removeESP(root)
-    local data = espData[root]
-    if data then
-        if data.highlight then data.highlight:Destroy() end
-        if data.billboard then data.billboard:Destroy() end
-        espData[root] = nil
-    end
-end
-
-espToggleBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        espToggleBtn.Text = "ESP: ON"
-        espToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
-    else
-        espToggleBtn.Text = "ESP: OFF"
-        espToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        for root in pairs(espData) do
-            removeESP(root)
-        end
-    end
-end)
+local function isRareKyeggo(name) return not COMMON_KYEGGOS[name] end
 
 local function isPlayerCharacter(model)
     for _, p in ipairs(Players:GetPlayers()) do
@@ -310,50 +338,200 @@ local function isPlayerCharacter(model)
     return false
 end
 
-task.spawn(function()
-    while true do
-        task.wait(0.4)
-        if not espEnabled then continue end
+local function getModelRoot(model)
+    if model.PrimaryPart then return model.PrimaryPart end
+    return model:FindFirstChildWhichIsA("BasePart", true)
+end
 
-        local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then continue end
+local function makeESPLabel(part, text, color)
+    if espLabels[part] then return end
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "KyeggoESP"
+    bb.Size = UDim2.new(0, 180, 0, 26)
+    bb.StudsOffset = Vector3.new(0, 3.5, 0)
+    bb.AlwaysOnTop = true
+    bb.MaxDistance = 300
+    bb.Adornee = part
+    bb.Parent = part
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    bg.BackgroundTransparency = 0.3
+    bg.BorderSizePixel = 0
+    bg.Parent = bb
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 5)
+    local stripe = Instance.new("Frame")
+    stripe.Size = UDim2.new(0, 4, 1, 0)
+    stripe.BackgroundColor3 = color
+    stripe.BorderSizePixel = 0
+    stripe.Parent = bg
+    Instance.new("UICorner", stripe).CornerRadius = UDim.new(0, 4)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -8, 1, 0)
+    lbl.Position = UDim2.new(0, 7, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = color
+    lbl.TextSize = 10
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextTruncate = Enum.TextTruncate.AtEnd
+    lbl.Parent = bg
+    espLabels[part] = bb
+end
 
-        local seen = {}
-        local count = 0
+local function removeESPLabel(part)
+    local bb = espLabels[part]
+    if bb then bb:Destroy() espLabels[part] = nil end
+end
 
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if not obj:IsA("Model") or not obj.Name:lower():find("kyeggo") or isPlayerCharacter(obj) then continue end
+local function clearAllESP()
+    for part, bb in pairs(espLabels) do
+        if bb and bb.Parent then bb:Destroy() end
+        espLabels[part] = nil
+    end
+end
 
-            local root = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
-            if not root then continue end
-
-            local distance = (root.Position - rootPart.Position).Magnitude
-            if distance > MAX_ESP_DISTANCE then 
-                removeESP(root)
-                continue 
-            end
-
-            seen[root] = true
-            count += 1
-
-            if not espData[root] then
-                createESP(obj)
-            end
-        end
-
-        -- Cleanup old ESP
-        for root in pairs(espData) do
-            if not seen[root] or not root.Parent then
-                removeESP(root)
-            end
-        end
-
-        espCountLabel.Text = "Models visible: " .. count
+espToggleBtn.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    if espEnabled then
+        espToggleBtn.Text = "ESP: ON"
+        espToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+    else
+        espToggleBtn.Text = "ESP: OFF"
+        espToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        clearAllESP()
     end
 end)
 
--- Auto Egg Collection (unchanged)
-local function isGroundEggPos(obj)
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if not espEnabled then continue end
+        local seenParts = {}
+        local npcCount = 0
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if not obj:IsA("Model") or not obj.Name:lower():find("^kyeggo") or isPlayerCharacter(obj) then continue end
+            local root = getModelRoot(obj)
+            if not root then continue end
+            seenParts[root] = true
+            npcCount += 1
+            if not espLabels[root] then
+                local rare = isRareKyeggo(obj.Name)
+                local prefix = rare and "⭐ " or "🔵 "
+                local color  = rare and espRareColor or espNormalColor
+                makeESPLabel(root, prefix .. obj.Name, color)
+            end
+        end
+        for part in pairs(espLabels) do
+            if not seenParts[part] or not part.Parent then removeESPLabel(part) end
+        end
+        espCountLabel.Text = "Visible: " .. npcCount
+    end
+end)
+
+-- ── FPS Boost System ─────────────────────────────────────────────────────────
+-- Tracks which parts we hid so we can restore them
+local hiddenObjects = {}
+
+-- Keywords to identify things to KEEP visible
+local function shouldKeep(obj)
+    if not obj:IsA("BasePart") and not obj:IsA("UnionOperation") and not obj:IsA("MeshPart") then
+        return true -- not a part, skip
+    end
+    local nameLower = obj.Name:lower()
+    -- Keep ground/terrain/baseplate
+    if nameLower:find("ground") or nameLower:find("base") or nameLower:find("terrain")
+    or nameLower:find("floor") or nameLower:find("grass") or nameLower:find("dirt")
+    or nameLower:find("road") or nameLower:find("path") or nameLower:find("sand") then
+        return true
+    end
+    -- Keep eggs
+    if nameLower:find("egg") then return true end
+    -- Keep Kyeggo models
+    if nameLower:find("kyeggo") then return true end
+    -- Keep player characters
+    for _, p in ipairs(Players:GetPlayers()) do
+        local char = p.Character
+        if char and obj:IsDescendantOf(char) then return true end
+    end
+    return false
+end
+
+local function shouldHide(obj)
+    -- Only target BaseParts, MeshParts, Unions (visual decorative geometry)
+    if not (obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("UnionOperation")) then
+        return false
+    end
+    if shouldKeep(obj) then return false end
+    -- Hide big decorative structures: buildings, props, walls, etc.
+    local nameLower = obj.Name:lower()
+    if nameLower:find("wall") or nameLower:find("build") or nameLower:find("house")
+    or nameLower:find("tree") or nameLower:find("bush") or nameLower:find("fence")
+    or nameLower:find("rock") or nameLower:find("stone") or nameLower:find("prop")
+    or nameLower:find("decoration") or nameLower:find("deco") or nameLower:find("pillar")
+    or nameLower:find("roof") or nameLower:find("ceiling") or nameLower:find("lamp")
+    or nameLower:find("light") or nameLower:find("post") or nameLower:find("sign")
+    or nameLower:find("chunk") or nameLower:find("struct") or nameLower:find("platform")
+    or nameLower:find("bridge") then
+        return true
+    end
+    return false
+end
+
+local function applyFpsBoost()
+    local count = 0
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if shouldHide(obj) and obj.LocalTransparencyModifier ~= nil then
+            if not hiddenObjects[obj] then
+                hiddenObjects[obj] = obj.LocalTransparencyModifier
+                pcall(function() obj.LocalTransparencyModifier = 1 end)
+                count += 1
+            end
+        end
+    end
+    -- Also handle Workspace.Terrain decorations
+    if Workspace:FindFirstChildOfClass("Terrain") then
+        local terrain = Workspace:FindFirstChildOfClass("Terrain")
+        pcall(function() terrain.Decoration = false end)
+    end
+    fpsStatusLabel.Text = "Hidden: " .. count .. " objects"
+end
+
+local function removeFpsBoost()
+    local count = 0
+    for obj, originalTransp in pairs(hiddenObjects) do
+        pcall(function()
+            if obj and obj.Parent then
+                obj.LocalTransparencyModifier = originalTransp
+                count += 1
+            end
+        end)
+    end
+    hiddenObjects = {}
+    -- Restore terrain decoration
+    if Workspace:FindFirstChildOfClass("Terrain") then
+        local terrain = Workspace:FindFirstChildOfClass("Terrain")
+        pcall(function() terrain.Decoration = true end)
+    end
+    fpsStatusLabel.Text = "Objects hidden: 0"
+end
+
+fpsToggleBtn.MouseButton1Click:Connect(function()
+    fpsBoostEnabled = not fpsBoostEnabled
+    if fpsBoostEnabled then
+        fpsToggleBtn.Text = "FPS Boost: ON"
+        fpsToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+        applyFpsBoost()
+    else
+        fpsToggleBtn.Text = "FPS Boost: OFF"
+        fpsToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 140, 30)
+        removeFpsBoost()
+    end
+end)
+
+-- ── Ground Egg Collection ─────────────────────────────────────────────────────
+local function isGroundEgg(obj)
     if not obj:IsA("MeshPart") then return false, nil end
     if not obj.Name:lower():find("egg") then return false, nil end
     if not obj.Parent or not obj.Parent.Name:lower():find("chunk") then return false, nil end
@@ -370,7 +548,7 @@ local function collectEggs()
     local eggsFound = 0
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if not isRunning or eggsFound >= MAX_PER_SWEEP then break end
-        local ok, targetPos = isGroundEggPos(obj)
+        local ok, targetPos = isGroundEgg(obj)
         if ok then
             eggsFound += 1
             root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
@@ -378,7 +556,7 @@ local function collectEggs()
             root.CFrame = originalCFrame
             task.wait(0.08)
             collected += 1
-            counterLabel.Text = "Eggs Collected: " .. collected
+            counterLabel.Text = "🥚 " .. collected
         end
     end
 end
@@ -390,4 +568,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ Egg Collector LOADED - Box ESP + 20 Studs Range")
+print("✅ Kyeggo Collector loaded — compact UI + FPS Boost ready")
