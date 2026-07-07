@@ -1,4 +1,4 @@
--- === TARGET BY IMAGE ID (More Reliable) ===
+-- === STRICT MOVE BUTTON CLICKER ===
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = game.Players.LocalPlayer
 
@@ -7,20 +7,22 @@ local enabled = false
 local function ClickMoveButton()
     for _, obj in ipairs(player.PlayerGui:GetDescendants()) do
         if (obj:IsA("ImageButton") or obj:IsA("ImageLabel")) and obj.Visible and obj.Image then
-            -- Target move buttons by image ID
-            if obj.Image:find("2562648980") then
+            
+            -- Very strict filter for move buttons
+            if (obj.Name == "Move1" or obj.Name == "Move2" or obj.Name == "Move3" or obj.Name == "Move4") 
+               and obj.Image:find("2562648980") then
                 
                 local pos = obj.AbsolutePosition
                 local size = obj.AbsoluteSize
                 
                 local x = pos.X + size.X / 2
-                local y = pos.Y + size.Y / 2 + 12   -- adjust this if needed
+                local y = pos.Y + size.Y / 2 + 15   -- bigger offset to go lower
                 
                 VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
                 task.wait(0.1)
                 VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
                 
-                print("Clicked ImageButton with ID 2562648980")
+                print("Clicked Move Button:", obj.Name)
                 return true
             end
         end
@@ -28,13 +30,13 @@ local function ClickMoveButton()
     return false
 end
 
--- Small GUI
+-- GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.ResetOnSpawn = false
 screenGui.Parent = (gethui or function() return game:GetService("CoreGui") end)()
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 240, 0, 140)
+frame.Size = UDim2.new(0, 250, 0, 140)
 frame.Position = UDim2.new(0.02, 0, 0.35, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,25)
 frame.Draggable = true
@@ -43,7 +45,7 @@ frame.Parent = screenGui
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,30)
 title.BackgroundColor3 = Color3.fromRGB(0,110,190)
-title.Text = "Image ID Clicker"
+title.Text = "Strict Move Clicker"
 title.TextColor3 = Color3.new(1,1,1)
 title.TextScaled = true
 title.Parent = frame
@@ -77,11 +79,11 @@ removeBtn.MouseButton1Click:Connect(function()
 end)
 
 task.spawn(function()
-    while task.wait(0.75) do
+    while task.wait(0.8) do
         if enabled then
             ClickMoveButton()
         end
     end
 end)
 
-print("Image ID Clicker loaded!")
+print("Strict Move Clicker loaded!")
