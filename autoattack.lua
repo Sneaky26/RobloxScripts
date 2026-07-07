@@ -1,4 +1,4 @@
--- === LOOMIAN LEGACY AUTO BATTLE SCRIPT ===
+
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = game.Players.LocalPlayer
 
