@@ -1,4 +1,4 @@
--- === SMALL + DRAGGABLE AUTO CLICKER ===
+-- === ADJUSTED CLICK OFFSET ===
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = game.Players.LocalPlayer
 
@@ -10,14 +10,15 @@ local function ClickMoveButton()
             if obj.Visible then
                 local pos = obj.AbsolutePosition
                 local size = obj.AbsoluteSize
+                
                 local x = pos.X + size.X / 2
-                local y = pos.Y + size.Y / 2 + 8
+                local y = pos.Y + size.Y / 2 + 15   -- Increased Y offset
                 
                 VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
                 task.wait(0.1)
                 VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
                 
-                print("Clicked:", obj.Name)
+                print("Clicked:", obj.Name, "at", x, y)
                 return true
             end
         end
@@ -25,17 +26,15 @@ local function ClickMoveButton()
     return false
 end
 
--- Small Draggable GUI
+-- Small GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.ResetOnSpawn = false
 screenGui.Parent = (gethui or function() return game:GetService("CoreGui") end)()
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 130)
+frame.Size = UDim2.new(0, 230, 0, 130)
 frame.Position = UDim2.new(0.02, 0, 0.4, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,25)
-frame.BorderSizePixel = 0
-frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
@@ -83,4 +82,4 @@ task.spawn(function()
     end
 end)
 
-print("Small Draggable Auto Clicker loaded!")
+print("Adjusted Clicker loaded! Try now.")
