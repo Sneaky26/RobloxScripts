@@ -12,7 +12,7 @@ local function ClickMoveButton()
                 local size = obj.AbsoluteSize
                 
                 local x = pos.X + size.X / 2
-                local y = pos.Y + size.Y / 2 + 15   -- Increased Y offset
+                local y = pos.Y + size.Y / 2 + 30   -- Increased Y offset
                 
                 VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
                 task.wait(0.1)
