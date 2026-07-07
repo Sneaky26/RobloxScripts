@@ -50,7 +50,7 @@ removeBtn.TextScaled = true
 removeBtn.Parent = frame
 
 -- Change these coordinates if needed
-local clickX = 650   -- Change this
+local clickX = 850   -- Change this
 local clickY = 450   -- Change this
 
 toggle.MouseButton1Click:Connect(function()
