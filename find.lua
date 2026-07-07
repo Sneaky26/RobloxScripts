@@ -51,7 +51,7 @@ removeBtn.Parent = frame
 
 -- Change these coordinates if needed
 local clickX = 850   -- Change this
-local clickY = 450   -- Change this
+local clickY = 650   -- Change this
 
 toggle.MouseButton1Click:Connect(function()
     enabled = not enabled
