@@ -1,4 +1,3 @@
-
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = game.Players.LocalPlayer
 
@@ -28,7 +27,7 @@ local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 280, 0, 320)
 frame.Position = UDim2.new(0.02, 0, 0.2, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,25)
-frame.Draggable = true
+frame.Draggable = true -- Note: Draggable is deprecated but still works. Consider using UserInputService for custom dragging.
 frame.Parent = screenGui
 
 local title = Instance.new("TextLabel")
@@ -57,11 +56,11 @@ toggle.TextColor3 = Color3.new(1,1,1)
 toggle.TextScaled = true
 toggle.Parent = frame
 
--- Move Buttons
+-- Move Buttons (Fixed alignment math)
 for i = 1,4 do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.45,0,0,35)
-    btn.Position = UDim2.new(0.05 + (i%2*0.5),0,0,120 + math.floor((i-1)/2)*40)
+    btn.Position = UDim2.new(0.05 + (((i-1)%2)*0.5),0,0,120 + math.floor((i-1)/2)*40)
     btn.BackgroundColor3 = (i == selectedMove) and Color3.fromRGB(0,180,0) or Color3.fromRGB(60,60,70)
     btn.Text = "Move " .. i
     btn.TextColor3 = Color3.new(1,1,1)
@@ -98,7 +97,7 @@ removeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Main Loop
+-- Main Loop (Fixed logical condition)
 task.spawn(function()
     while task.wait(0.7) do
         if not enabled then 
@@ -108,11 +107,10 @@ task.spawn(function()
         
         status.Text = "Status: Looking for battle..."
         
-        -- Click Fight first if available
-        if ClickAt(coords.Fight[1], coords.Fight[2]) then
-            status.Text = "Status: Clicked Fight"
-            task.wait(0.6)
-        end
+        -- Click Fight first
+        ClickAt(coords.Fight[1], coords.Fight[2])
+        status.Text = "Status: Clicked Fight"
+        task.wait(0.6) -- Ensures the game has time to open the move selection menu
         
         -- Click selected move
         local moveCoord = coords["Move" .. selectedMove]
