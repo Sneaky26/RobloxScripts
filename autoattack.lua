@@ -4,6 +4,7 @@ local player = game.Players.LocalPlayer
 local enabled = false
 local selectedMove = 1
 
+-- TIP: Adjust these coordinates based on your MuMu Player window size/aspect ratio!
 local coords = {
     Fight = {700, 480},
     Move1 = {480, 450},
@@ -12,13 +13,16 @@ local coords = {
     Move4 = {900, 520}
 }
 
+-- Mobile Touch Input Simulation for Delta Emulator
 local function ClickAt(x, y)
-    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-    task.wait(0.1)
-    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    -- State 0 = Touch down / Press
+    VirtualInputManager:SendTouchEvent(0, 0, x, y)
+    task.wait(0.05)
+    -- State 2 = Touch up / Release
+    VirtualInputManager:SendTouchEvent(0, 2, x, y)
 end
 
--- GUI
+-- GUI Setup
 local screenGui = Instance.new("ScreenGui")
 screenGui.ResetOnSpawn = false
 screenGui.Parent = (gethui or function() return game:GetService("CoreGui") end)()
@@ -27,9 +31,44 @@ local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 280, 0, 320)
 frame.Position = UDim2.new(0.02, 0, 0.2, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,25)
-frame.Draggable = true -- Note: Draggable is deprecated but still works. Consider using UserInputService for custom dragging.
 frame.Parent = screenGui
 
+-- CUSTOM DRAGGING LOGIC FOR MOBILE / EMULATORS
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- UI Elements
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,35)
 title.BackgroundColor3 = Color3.fromRGB(0,120,200)
@@ -56,7 +95,7 @@ toggle.TextColor3 = Color3.new(1,1,1)
 toggle.TextScaled = true
 toggle.Parent = frame
 
--- Move Buttons (Fixed alignment math)
+-- Chronological Move Buttons (Fixed alignment math)
 for i = 1,4 do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.45,0,0,35)
@@ -69,7 +108,6 @@ for i = 1,4 do
     
     btn.MouseButton1Click:Connect(function()
         selectedMove = i
-        -- Update colors
         for _, b in ipairs(frame:GetChildren()) do
             if b:IsA("TextButton") and b.Text:find("Move") then
                 b.BackgroundColor3 = (tonumber(b.Text:match("%d+")) == i) and Color3.fromRGB(0,180,0) or Color3.fromRGB(60,60,70)
@@ -97,9 +135,9 @@ removeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Main Loop (Fixed logical condition)
+-- Main Automation Loop
 task.spawn(function()
-    while task.wait(0.7) do
+    while task.wait(0.8) do
         if not enabled then 
             status.Text = "Status: Stopped"
             continue 
@@ -107,16 +145,16 @@ task.spawn(function()
         
         status.Text = "Status: Looking for battle..."
         
-        -- Click Fight first
+        -- Click Fight
         ClickAt(coords.Fight[1], coords.Fight[2])
         status.Text = "Status: Clicked Fight"
-        task.wait(0.6) -- Ensures the game has time to open the move selection menu
+        task.wait(0.6) -- Give the UI menu a split second to transition open
         
-        -- Click selected move
+        -- Click Selected Move
         local moveCoord = coords["Move" .. selectedMove]
         ClickAt(moveCoord[1], moveCoord[2])
         status.Text = "Status: Clicked Move " .. selectedMove
     end
 end)
 
-print("Loomian Auto Battle loaded! Select move then enable.")
+print("Loomian Auto Battle loaded! Dragging fixed for MuMu/Delta.")
