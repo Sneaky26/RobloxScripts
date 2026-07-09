@@ -3,6 +3,7 @@ local player = game.Players.LocalPlayer
 
 local enabled = false
 local selectedMove = 1
+local isMinimized = false
 
 -- TIP: Adjust these coordinates based on your MuMu Player window size/aspect ratio!
 local coords = {
@@ -28,9 +29,10 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = (gethui or function() return game:GetService("CoreGui") end)()
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 320)
+frame.Size = UDim2.new(0, 280, 0, 230) -- Adjusted height since bottom button is gone
 frame.Position = UDim2.new(0.02, 0, 0.2, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,25)
+frame.ClipsDescendants = true -- Allows content to hide when minimized
 frame.Parent = screenGui
 
 -- CUSTOM DRAGGING LOGIC FOR MOBILE / EMULATORS
@@ -68,14 +70,34 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- UI Elements
+-- Title Bar (Shortened width to fit window controls)
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,35)
+title.Size = UDim2.new(1, -70, 0, 35)
 title.BackgroundColor3 = Color3.fromRGB(0,120,200)
 title.Text = "Loomian Auto Battle"
 title.TextColor3 = Color3.new(1,1,1)
 title.TextScaled = true
 title.Parent = frame
+
+-- Minimize Button (-)
+local miniBtn = Instance.new("TextButton")
+miniBtn.Size = UDim2.new(0, 30, 0, 35)
+miniBtn.Position = UDim2.new(1, -65, 0, 0)
+miniBtn.BackgroundColor3 = Color3.fromRGB(0,100,180)
+miniBtn.Text = "-"
+miniBtn.TextColor3 = Color3.new(1,1,1)
+miniBtn.TextScaled = true
+miniBtn.Parent = frame
+
+-- Close Button (X)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 35)
+closeBtn.Position = UDim2.new(1, -35, 0, 0)
+closeBtn.BackgroundColor3 = Color3.fromRGB(170, 30, 30)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.TextScaled = true
+closeBtn.Parent = frame
 
 local status = Instance.new("TextLabel")
 status.Size = UDim2.new(1,0,0,25)
@@ -116,22 +138,25 @@ for i = 1,4 do
     end)
 end
 
-local removeBtn = Instance.new("TextButton")
-removeBtn.Size = UDim2.new(0.9,0,0,35)
-removeBtn.Position = UDim2.new(0.05,0,0,260)
-removeBtn.BackgroundColor3 = Color3.fromRGB(170,30,30)
-removeBtn.Text = "Remove GUI"
-removeBtn.TextColor3 = Color3.new(1,1,1)
-removeBtn.TextScaled = true
-removeBtn.Parent = frame
-
+-- Window Control Functionality
 toggle.MouseButton1Click:Connect(function()
     enabled = not enabled
     toggle.Text = enabled and "DISABLE AUTO BATTLE" or "ENABLE AUTO BATTLE"
     toggle.BackgroundColor3 = enabled and Color3.fromRGB(160,0,0) or Color3.fromRGB(0,160,0)
 end)
 
-removeBtn.MouseButton1Click:Connect(function()
+miniBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        frame.Size = UDim2.new(0, 280, 0, 35) -- Collapses to just show the title bar
+        miniBtn.Text = "+"
+    else
+        frame.Size = UDim2.new(0, 280, 0, 230) -- Expands back to full menu size
+        miniBtn.Text = "-"
+    end
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
@@ -157,4 +182,4 @@ task.spawn(function()
     end
 end)
 
-print("Loomian Auto Battle loaded! Dragging fixed for MuMu/Delta.")
+print("Loomian Auto Battle loaded! Window controls added.")
